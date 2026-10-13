@@ -27,6 +27,16 @@ class ChooserTests(unittest.TestCase):
         self.assertIsNone(chooser.pick_key("x"))
         self.assertIsNone(chooser.pick_key("9"))
 
+    def test_offset_selector_digit_keys_pick_the_chip_they_label(self):
+        """On "When should it ring?", `0` picks At start and `1` picks 15 minutes, as the chips show."""
+        chooser = alarm_amount_chooser()
+        self.assertEqual(chooser.pick_key("0"), 0)
+        self.assertEqual(chooser.pick_key("1"), 1)
+        self.assertEqual(chooser.pick_key("h"), 2)
+        self.assertEqual(chooser.value_at(0), "0")
+        self.assertEqual(chooser.value_at(1), "15 minute")
+        self.assertIsNone(chooser.pick_key("2"))
+
     def test_move_does_not_wrap(self):
         """`Chooser.move` clamps at the first and last option instead of wrapping around."""
         chooser = type_chooser()

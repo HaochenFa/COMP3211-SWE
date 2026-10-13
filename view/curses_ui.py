@@ -83,6 +83,20 @@ HELP_LINES = (
 )
 
 
+def title_bar_text(title: str, width: int) -> str:
+    """Fit ``PIM  <file>`` into ``width`` columns, keeping the end of the path.
+
+    The file name and the unsaved ``*`` matter most, so a long folder path is
+    trimmed from the left and never runs into the clock.
+    """
+    if display_width(title) <= width:
+        return title
+    head, sep, path = title.partition("  ")
+    if not sep:
+        return clip(title, width)
+    return head + sep + clip_left(path, width - display_width(head + sep))
+
+
 def run_curses(terminal) -> None:
     """Run the curses session for ``terminal`` until it stops."""
     curses.wrapper(lambda stdscr: CursesUI(terminal, stdscr).loop())
@@ -113,6 +127,9 @@ class CursesUI:
         curses.noecho()
         curses.cbreak()
         self.stdscr.keypad(True)
+        # ncurses waits a full second after Esc for an escape sequence; arrow
+        # keys arrive well inside 25 ms, so a lone Esc cancels at once.
+        curses.set_escdelay(25)
         self.stdscr.timeout(500)
         self.theme = init_theme(curses)
         if self.theme.rich:
@@ -232,6 +249,11 @@ class CursesUI:
         except curses.error:
             pass
 
+    def _blank(self, y: int, x: int, h: int, w: int) -> None:
+        """Clear the inside of an ``h`` by ``w`` box, so a pop-up never shows the panes behind it."""
+        for row in range(y + 1, y + h - 1):
+            self._fill(row, 0, x + 1, w - 2)
+
     def _frame(self, y: int, x: int, h: int, w: int, title: str, attr: int = 0) -> None:
         """Titled widget border using ACS line drawing."""
         if h < 2 or w < 2:
@@ -283,9 +305,9 @@ class CursesUI:
         clock = now.astimezone(HKT).strftime("HKT %H:%M") if isinstance(now, datetime) else ""
         bar = self._attr(TITLE)
         self._fill(geo.title_y, bar)
-        self._put(geo.title_y, 1, screen.title, bar)
+        clock_x = max(0, width - display_width(clock) - 2) if clock else width
+        self._put(geo.title_y, 1, title_bar_text(screen.title, clock_x - 3), bar)
         if clock:
-            clock_x = max(0, width - display_width(clock) - 2)
             self._put(geo.title_y, clock_x, clock, bar)
         self._draw_alarm(geo, screen, width)
         modal = picker is not None or browser is not None or self.show_help or (self.print_open and screen.print_text)
@@ -522,6 +544,7 @@ class CursesUI:
         box_h = min(height - 2, 18)
         y0 = max(0, (height - box_h) // 2)
         x0 = max(0, (width - box_w) // 2)
+        self._blank(y0, x0, box_h, box_w)
         self._frame(y0, x0, box_h, box_w, picker.title, self._attr(TITLE))
         inner_w = box_w - 2
         month = f"<  {picker.month_title()}  >"
@@ -592,8 +615,7 @@ class CursesUI:
         y0 = max(0, (height - box_h) // 2)
         x0 = max(0, (width - box_w) // 2)
         inner_w = max(1, box_w - 4)
-        for row in range(y0 + 1, y0 + box_h - 1):
-            self._fill(row, 0, x0 + 1, box_w - 2)
+        self._blank(y0, x0, box_h, box_w)
         self._frame(y0, x0, box_h, box_w, browser.title, self._attr(TITLE))
         self._put(y0 + 1, x0 + 2, clip_left(str(browser.cwd), inner_w), self._attr(QUIET))
         list_y = y0 + 2
@@ -639,6 +661,7 @@ class CursesUI:
         box_h = max(3, min(box_h, height - 2))
         y0 = max(0, (height - box_h) // 2)
         x0 = max(0, (width - box_w) // 2)
+        self._blank(y0, x0, box_h, box_w)
         self._frame(y0, x0, box_h, box_w, title, self._attr(TITLE))
         for i, line in enumerate(lines[: box_h - 2]):
             self._put(y0 + 1 + i, x0 + 2, clip(line, box_w - 4), 0)

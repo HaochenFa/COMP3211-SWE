@@ -13,8 +13,8 @@ These belong to the group. An agent must not claim them as done.
 | SRS | 1 (6 pts) | Group review of `docs/deliverables/SRS.md`. Add group number, member names, and student ids, then drop "draft" from the title page. |
 | Design document | 2 (5 pts) | Group review of `docs/deliverables/DESIGN.md`, same title-page edits. |
 | PDF build | 1, 2, 3 | `sh docs/deliverables/build.sh` renders every document and diagram to `dist/`. Rebuild after the last edit to any Markdown source. |
-| System video | 3d | MP4, at most 4 minutes, following the demo script below. |
-| Presentation | 5 (4 pts) | Slides as PDF and a recording as MP4, at most 5 minutes. Every member presents at least 1 minute with face and student ID card visible. Content: one create-a-PIR requirement, one criterion requirement, one search requirement, the MVC design (DESIGN §2–3), and one lesson learned (for example: US7 became unit-testable only once the model was separated from input and output). |
+| System video | 3d | Scripted: `vhs docs/deliverables/video/demo.tape` (after `brew install vhs`) types the demo script below into the real curses UI and renders `dist/demo.mp4`, about 3 minutes, with a caption bar naming each user story. Group: watch it, then re-render on the submission Mac so the dates are current. |
+| Presentation | 5 (4 pts) | A draft deck with speaker notes exists as a private claude.ai Slides artifact (11 slides, four speaker sections of about 70 seconds; group number, names, and the lesson's own example are placeholders); download it as PDF. Still to do: the recording. Slides as PDF and a recording as MP4, at most 5 minutes. Every member presents at least 1 minute with face and student ID card visible. Content: one create-a-PIR requirement, one criterion requirement, one search requirement, the MVC design (DESIGN §2–3), and one lesson learned (for example: US7 became unit-testable only once the model was separated from input and output). |
 | Honour Declaration | required | At the ZIP root. Acknowledge GenAI use honestly (this repository's `AGENTS.md` and history show it) and state the agreed contribution split. Missing or false: up to 30 % penalty. |
 | ZIP | all | One archive. SRS, design, and manual PDFs at the root; `REQUIREMENTS.md`/`.pdf` and `coverage.txt`/`coverage.pdf` in the source root next to `pim.py`; the Honour Declaration at the ZIP root. |
 
@@ -24,7 +24,7 @@ These belong to the group. An agent must not claim them as done.
   1. `c` → create a Note → `W` → "+ New file in this folder…" → type `pimtest` → Enter. The status line reads `Saved /Users/<you>/…/pimtest.pim`.
   2. `q` quits without asking, because nothing is unsaved. Relaunch, press `o`, and open `pimtest.pim`. The Note is back, and the status line reads `Loaded …`.
   3. `o`, then `/`, then type `~/x.json` and Enter: `path must have a .pim extension`.
-  4. Create a Note so the collection is dirty, then `o`: save / discard / cancel appears first.
+  4. Create a Note so the collection is dirty, then `o` and pick a `.pim` file: save / discard / cancel appears before anything loads.
   5. `W` → `~` goes home; `⌫` goes up and highlights the folder you came from; Esc cancels and changes nothing.
   6. Confirm no folder named `~` was created anywhere, then delete the test file.
 - **Demo script** below, once end to end on the recording machine.
@@ -64,3 +64,4 @@ These do not break a requirement. Fix only if time allows; each must keep `pytho
 | 2026-09-24 | Folded PRODUCT.md into the SRS, ARCHITECTURE.md into DESIGN, and ACCEPTANCE.md into the SRS and this file; deleted CONTEXT.md | branch `docs/merge-working-docs` |
 | 2026-09-25 | One Esc cancels the typed path field while the path the browser pre-filled is unedited (was two presses) | branch `fix/full-marks-polish` |
 | 2026-09-25 | Second audit against the brief: HKT falls back to fixed UTC+8 without a time-zone database; docstrings on every `model` method and every test; typed `Terminal` interface; DESIGN §3.2 tables for every public View and Controller class; a verification line for every SRS requirement; PDFs rebuilt | branch `fix/full-marks-polish` |
+| 2026-09-25 | Found while scripting the demo video: the alarm-offset selector's `0`/`1` keys picked the wrong chip; PRINT, HELP, and calendar pop-ups showed the panes behind them; a long title path ran into the clock; Esc waited a full second. Added the VHS demo tape | branch `chore/demo-video-and-slides` |

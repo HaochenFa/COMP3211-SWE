@@ -335,7 +335,7 @@ None of these methods raises to its caller. Each command is run inside a handler
 - `stdscr`: the curses window
 - `theme: Theme`
 
-It has one public method, `loop() -> None`: the full-screen event loop (`get_wch` with a 500 ms timeout). Every command runs through `_safe`, which turns any exception into a status line. It raises no exception to its caller.
+It has one public method, `loop() -> None`: the full-screen event loop (`get_wch` with a 500 ms timeout, and a 25 ms Esc delay so a lone Esc acts at once). Every command runs through `_safe`, which turns any exception into a status line. It raises no exception to its caller. The module function `title_bar_text(title: str, width: int) -> str` fits the title bar beside the clock, trimming a long file path from the left so the file name stays visible.
 
 ### Classes `Chooser` and `Choice` (module `view.widgets`)
 
@@ -347,7 +347,7 @@ A `Chooser` is a closed list of answers, for example Note · Task · Event · Co
 |----------------------|------------------------------|--------------------------------|--------------------------|----------------------------------------------|
 | `int` | `clamp` | `index: int` | none | Keeps `index` inside the option list. |
 | `int` | `move` | `index: int`, `delta: int` | none | Moves by `delta` without wrapping. |
-| `int \| None` | `pick_key` | `char: str` | none | The option chosen by a digit (1-based) or its key; `None` if no match. |
+| `int \| None` | `pick_key` | `char: str` | none | The option whose key is `char`; else, when no option has a digit key, the option at that 1-based digit; `None` if no match. |
 | `str` | `value_at` | `index: int` | none | The value to submit for that option. |
 
 ### Class `DateTimePicker` (module `view.widgets`)

@@ -71,18 +71,23 @@ class Chooser:
         return self.clamp(index + delta)
 
     def pick_key(self, char: str) -> int | None:
-        """Index for a digit (1-based) or an option ``key``. None if no match."""
+        """Index for an option ``key``, else a 1-based digit. None if no match.
+
+        An option's own key wins, so the offsets selector's ``0`` (At start)
+        and ``1`` (15 minutes) mean what the chips show. Positional digits
+        apply only when no option uses a digit as its key.
+        """
         if not char:
-            return None
-        if char.isdigit():
-            number = int(char)
-            if 1 <= number <= len(self.options):
-                return number - 1
             return None
         folded = char.casefold()
         for index, option in enumerate(self.options):
             if option.key is not None and option.key.casefold() == folded:
                 return index
+        digit_keys = any(option.key is not None and option.key.isdigit() for option in self.options)
+        if char.isdigit() and not digit_keys:
+            number = int(char)
+            if 1 <= number <= len(self.options):
+                return number - 1
         return None
 
     def value_at(self, index: int) -> str:

@@ -2,8 +2,9 @@
 
 import curses
 import unittest
+from unittest import mock
 
-from view.curses_ui import CursesUI
+from view.curses_ui import CursesUI, title_bar_text
 from view.keys import CREATE, SEARCH
 from tests.unit.test_terminal import make_terminal
 from model import Note
@@ -301,3 +302,62 @@ class BrowserKeyTests(unittest.TestCase):
         self.ui._edit("\x15")
         self.assertEqual(self.ui.buffer, "work")
         self.assertEqual(self.ui.cursor, 0)
+
+
+class GridScreen:
+    """A character grid that records what the UI writes, for drawing tests."""
+
+    def __init__(self, height=20, width=60):
+        self.rows = [[" "] * width for _ in range(height)]
+
+    def getmaxyx(self):
+        return (len(self.rows), len(self.rows[0]))
+
+    def addstr(self, y, x, text, attr=0):
+        for offset, char in enumerate(text):
+            if x + offset < len(self.rows[y]):
+                self.rows[y][x + offset] = char
+
+    def addch(self, y, x, char, attr=0):
+        self.rows[y][x] = char
+
+    def hline(self, y, x, char, count):
+        for offset in range(count):
+            self.rows[y][x + offset] = char
+
+    def text(self, y):
+        return "".join(self.rows[y])
+
+
+class DrawingTests(unittest.TestCase):
+    """Pop-ups and the title bar, drawn onto a fake screen."""
+
+    def setUp(self):
+        # ACS line-drawing names exist only after initscr(); plain characters stand in.
+        patches = {"ACS_HLINE": "-", "ACS_VLINE": "|", "ACS_ULCORNER": "+", "ACS_URCORNER": "+", "ACS_LLCORNER": "+", "ACS_LRCORNER": "+"}
+        for name, char in patches.items():
+            patcher = mock.patch.object(curses, name, char, create=True)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        _app, term, _out = make_terminal()
+        self.screen = GridScreen()
+        self.ui = CursesUI(term, self.screen)
+
+    def test_print_popup_blanks_the_panes_behind_it(self):
+        """A PRINT box shorter than the text under it shows only its own lines, not the old text."""
+        for row in range(20):
+            self.screen.addstr(row, 0, "x" * 60)
+        self.ui._box(60, 20, "PRINT", ["Id: 3"], box_w=30, box_h=5)
+        inside = [self.screen.text(row)[16:44] for row in range(8, 11)]
+        self.assertEqual(inside[0].strip(), "Id: 3")
+        self.assertEqual(inside[1].strip(), "")
+        self.assertNotIn("x", "".join(inside))
+
+    def test_long_title_keeps_the_file_name_and_clears_the_clock(self):
+        """A long bound path is trimmed from the left, so `demo.pim*` stays and the text fits its room."""
+        title = "PIM  /Users/student/Documents/COMP3211/group/project/demo.pim*"
+        fitted = title_bar_text(title, 30)
+        self.assertTrue(fitted.startswith("PIM  ..."))
+        self.assertTrue(fitted.endswith("demo.pim*"))
+        self.assertLessEqual(len(fitted), 30)
+        self.assertEqual(title_bar_text("PIM  untitled", 30), "PIM  untitled")
