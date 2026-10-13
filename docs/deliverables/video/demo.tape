@@ -24,12 +24,12 @@ Set Shell "bash"
 Set FontFamily "Menlo"
 Set FontSize 22
 Set Width 1920
-Set Height 980
+Set Height 1060
 Set Padding 12
 Set Framerate 30
 Set TypingSpeed 55ms
 
-# caption: Start | python3 pim.py opens an empty, untitled collection
+# caption: Start | Start the PIM. It opens with an empty, untitled collection.
 Hide
 Type@1ms `export BASH_SILENCE_DEPRECATION_WARNING=1; rm -rf /tmp/pim-demo && mkdir -p /tmp/pim-demo/student/Documents && ln -s "$PWD/pim.py" /tmp/pim-demo/student/Documents/pim.py && tmux -L pimdemo -f docs/deliverables/video/demo.tmux.conf new-session -s demo -c /tmp/pim-demo/student/Documents -e HOME=/tmp/pim-demo/student -e PS1='\W $ ' -e BASH_SILENCE_DEPRECATION_WARNING=1 'bash --norc --noprofile'`
 Enter
@@ -44,7 +44,7 @@ Sleep 600ms
 Enter
 Sleep 4s
 
-# caption: US1 · US2 | Create a Note: press c, pick Note, then type the text
+# caption: US1, US2 | Create a Note: press c, choose Note, and type the text.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -60,7 +60,7 @@ Sleep 500ms
 Enter
 Sleep 3.5s
 
-# caption: US3 | Create a Task: the deadline is picked from a calendar in Hong Kong Time
+# caption: US3 | Create a Task. Its deadline is picked from a calendar, in Hong Kong time.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -87,7 +87,7 @@ Sleep 1.3s
 Enter
 Sleep 3.5s
 
-# caption: US4 | Create an Event: a start time and two alarms, one relative and one absolute
+# caption: US4 | Create an Event with a start time and two alarms: one relative, one absolute.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -118,7 +118,7 @@ Sleep 1.2s
 Enter
 Sleep 1.5s
 
-# caption: Alarm Alerts | OVERDUE and SOON alarms show inside the program; d dismisses one
+# caption: Alarms | An alarm that is due appears in the red bar at the top of the screen.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -128,7 +128,7 @@ Sleep 1.5s
 Type "n"
 Sleep 5s
 
-# caption: US5 | Create a Contact: name, address, and mobile number
+# caption: US5 | Create a Contact with a name, an address, and a mobile number.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -149,7 +149,7 @@ Type "91234567"
 Enter
 Sleep 4s
 
-# caption: US7 | Search: a type test and a contains test joined by &&
+# caption: US7 | Search for Events whose description contains "comp". Only the lecture matches.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -163,7 +163,7 @@ Sleep 800ms
 Enter
 Sleep 5s
 
-# caption: US8 | Print every field of the selected PIR, with each alarm's effective time
+# caption: US8 | Print the selected Event, including the time each alarm will ring.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -175,7 +175,7 @@ Sleep 7s
 Escape
 Sleep 1s
 
-# caption: US6 | Modify: Enter keeps a field. Move the start one day later
+# caption: US6 | Modify the Event. Enter keeps a field as it is; the start moves one day later.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -193,7 +193,7 @@ Sleep 1.3s
 Type "n"
 Sleep 1.6s
 
-# caption: US6 | The relative alarm moved with the start; the absolute alarm stayed
+# caption: US6 | The relative alarm moved with the new start. The absolute alarm did not.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -205,7 +205,7 @@ Sleep 7s
 Escape
 Sleep 1s
 
-# caption: US7 | Esc shows every PIR again. Then search with || and !
+# caption: US7 | Esc clears the search. The next search combines conditions with || and !.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -223,7 +223,7 @@ Sleep 5s
 Escape
 Sleep 1s
 
-# caption: Invalid input | One clear error, no crash, nothing changed; the typed criterion stays
+# caption: Errors | "tomorrow" is not a valid time, so the PIM explains the error and changes nothing.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -241,7 +241,7 @@ Sleep 400ms
 Escape
 Sleep 1s
 
-# caption: US8 | print all: every PIR in the Current Result
+# caption: US8 | Print all PIRs in the current list.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -255,7 +255,7 @@ Sleep 4s
 Escape
 Sleep 1s
 
-# caption: US9 | Delete the selected PIR after a Yes / No question
+# caption: US9 | Delete the selected PIR. The PIM asks for confirmation first.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -269,7 +269,7 @@ Sleep 1.6s
 Type "y"
 Sleep 4s
 
-# caption: US10 | Save as a .pim file from the folder browser
+# caption: US10 | Save the PIRs to a .pim file, choosing the folder in a file browser.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -285,7 +285,7 @@ Sleep 600ms
 Enter
 Sleep 4.5s
 
-# caption: US11 | Quit, start again, and load the file: the same PIRs with the same Ids
+# caption: US11 | Quit, start again, and load the file. The PIRs come back with the same Ids.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -305,7 +305,7 @@ Sleep 1s
 Enter
 Sleep 5s
 
-# caption: Ids | Ids are never reused: the new Note gets Id 5, not Id 1
+# caption: Ids | A new Note gets Id 5. The Id of a deleted PIR is never reused.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -320,7 +320,7 @@ Type "Buy printer paper"
 Enter
 Sleep 4.5s
 
-# caption: Unsaved changes | Quit asks Save / Discard / Cancel and never drops changes silently
+# caption: Unsaved | Quitting with unsaved changes asks whether to save, discard, or cancel.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -332,7 +332,7 @@ Sleep 4s
 Type "s"
 Sleep 3.5s
 
-# caption: US1 – US11 | All shown. Every unit test passes, with 100% line coverage of model
+# caption: Done | That covers all eleven user stories, US1 to US11.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`

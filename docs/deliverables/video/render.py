@@ -47,17 +47,17 @@ CAPTION_HTML = """<!doctype html>
 <html><head><meta charset="utf-8"><style>
 html, body {{ margin: 0; width: {width}px; height: {height}px; overflow: hidden; background: #121316; }}
 .band {{
-  box-sizing: border-box; height: 100%; display: flex; align-items: center; gap: 28px;
-  padding: 0 56px; border-top: 3px solid #fde68a; color: #f5f5f4;
-  font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Helvetica, sans-serif;
+  box-sizing: border-box; height: 100%; display: flex; align-items: center; gap: 18px;
+  padding: 0 24px; border-top: 1px solid #3f3f46; color: #e7e5e4;
+  font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Helvetica, sans-serif;
 }}
-.count {{ flex: none; min-width: 84px; font: 600 26px Menlo, monospace; color: #a8a29e; }}
+.count {{ flex: none; min-width: 52px; font: 18px Menlo, monospace; color: #78716c; }}
 .tag {{
-  flex: none; padding: 8px 18px; border-radius: 10px; background: #fde68a; color: #1c1917;
-  font-size: 30px; font-weight: 700; letter-spacing: 0.01em; white-space: nowrap;
+  flex: none; padding: 3px 10px; border-radius: 6px; background: #fde68a; color: #1c1917;
+  font-size: 18px; font-weight: 600; white-space: nowrap;
 }}
-.text {{ font-size: 40px; font-weight: 600; line-height: 1.2; }}
-.progress {{ position: fixed; left: 0; bottom: 0; height: 6px; width: {progress}%; background: #fde68a; }}
+.text {{ font-size: 27px; font-weight: 500; line-height: 1.25; }}
+.progress {{ position: fixed; left: 0; bottom: 0; height: 3px; width: {progress}%; background: #fde68a; }}
 </style></head>
 <body><div class="band">{count}<span class="tag">{tag}</span><span class="text">{text}</span></div>
 <div class="progress"></div></body></html>
@@ -150,7 +150,7 @@ def render_captions(captions: list[tuple[str, str]], width: int, height: int, fo
     images = []
     for index, (tag, text) in enumerate(captions):
         step = index if 0 < index <= numbered else None
-        count = f'<span class="count">{step} / {numbered}</span>' if step else ""
+        count = f'<span class="count">{step}/{numbered}</span>' if step else ""
         page = folder / f"caption{index:02d}.html"
         page.write_text(CAPTION_HTML.format(
             width=width, height=height, count=count, tag=html.escape(tag), text=html.escape(text),
