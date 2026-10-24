@@ -13,8 +13,8 @@
 # under /tmp, so the folder browser never shows a real home folder.
 #
 # Each caption line is followed by a `# narration: <text>` line: the
-# voiceover for that step, spoken by macOS `say` from the moment the caption
-# appears. It is written to be heard, not read ("or" for ||, "P I R" for
+# voiceover for that step, spoken by a text-to-speech voice from the moment
+# the caption appears. It is written to be heard, not read ("or" for ||, "P I R" for
 # PIR), and must finish before the next step starts; render.py checks this.
 #
 # Pace: each step waits about 2 s after its caption appears before the

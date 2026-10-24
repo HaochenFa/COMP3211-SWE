@@ -4,7 +4,8 @@ Four tools, one command, run from the repository root:
 
     python3 docs/deliverables/video/render.py            # record, then compose
     python3 docs/deliverables/video/render.py --no-record  # recompose only
-    python3 docs/deliverables/video/render.py --no-record --voice Daniel
+    python3 docs/deliverables/video/render.py --no-record --voice bf_emma
+    python3 docs/deliverables/video/render.py --no-record --engine say
 
 1. VHS plays demo.tape against the real curses UI and writes
    dist/demo-raw.mp4. The tmux status line in that recording is a step
@@ -12,19 +13,22 @@ Four tools, one command, run from the repository root:
 2. Headless Google Chrome renders one caption bar per ``# caption:`` line
    in the tape, as a PNG. This ffmpeg build has no text filters, so text is
    drawn by the browser instead.
-3. macOS ``say`` speaks each ``# narration:`` line, and the clips are laid
-   into one voiceover track, each starting where its step starts. A clip
-   that would run into the next step stops the render with the step named,
-   so the wording, not the recording, is what gets shortened.
+3. A text-to-speech engine speaks each ``# narration:`` line, and the
+   clips are laid into one voiceover track, each starting where its step
+   starts. A clip that would run into the next step stops the render with
+   the step named, so the wording, not the recording, is what gets
+   shortened. The default engine is Kokoro, an open neural voice model
+   (hexgrad/Kokoro-82M), run as an outside command through ``uv`` like
+   ffmpeg; ``--engine say`` uses the older, more robotic macOS voices.
 4. ffmpeg crops the marker line off the recording, stacks the caption bar
    underneath, switches captions at the marker flips, adds the voiceover,
    and writes dist/demo.mp4 at 1920x1080.
 
 Needs ``brew install vhs`` (which brings ttyd and ffmpeg), Google Chrome,
-and macOS for ``say``. The default voice, Samantha, ships with macOS; a
-Premium or Enhanced voice must first be downloaded in System Settings >
-Accessibility > Spoken Content > System Voice, then passed with --voice.
-Standard library only; this script is tooling, not part of the PIM.
+and ``brew install uv`` for Kokoro. The first Kokoro run downloads its
+Python packages into uv's cache and the model (about 330 MB) from Hugging
+Face; later runs work offline. Standard library only; this script is
+tooling, not part of the PIM.
 """
 
 from __future__ import annotations
@@ -52,8 +56,16 @@ LIMIT_SECONDS = 240  # the brief: no more than 4 minutes
 MARKERS = {"green": (0, 255, 0), "magenta": (255, 0, 255)}
 CAPTION_LINE = re.compile(r"^# caption: (.+?) \| (.+)$")
 NARRATION_LINE = re.compile(r"^# narration: (.+)$")
-VOICE = "Samantha"
-SAMPLE_RATE = 48000
+VOICES = {"kokoro": "af_heart", "say": "Samantha"}  # default voice per engine
+# Kokoro 0.9.4 with its dependencies as released by mid-2025: newer
+# huggingface_hub and torchvision releases break it. A uv-managed Python
+# keeps packages from another Python install (such as Anaconda) out.
+KOKORO = [
+    "uv", "run", "--quiet", "--no-project", "--managed-python", "--python", "3.12",
+    "--exclude-newer", "2025-06-01", "--with", "kokoro==0.9.4", "--with", "pip",
+    "python", "-m", "kokoro",
+]
+SAMPLE_RATE = 24000  # Kokoro's native rate; say is asked for the same
 NARRATION_GAP = 0.4  # seconds of quiet a clip must leave before the next step
 
 CAPTION_HTML = """<!doctype html>
@@ -190,8 +202,16 @@ def render_captions(captions: list[tuple[str, str]], width: int, height: int, fo
     return images
 
 
+def speak(engine: str, voice: str, text: str, clip: Path) -> None:
+    """Write ``text`` spoken by ``voice`` to ``clip`` as 16-bit mono WAV at SAMPLE_RATE."""
+    if engine == "kokoro":
+        run([*KOKORO, "--voice", voice, "--text", text, "--output-file", str(clip)], cwd=clip.parent)
+    else:
+        run(["say", "-v", voice, f"--data-format=LEI16@{SAMPLE_RATE}", "-o", str(clip), text])
+
+
 def narrate(lines: list[str], tags: list[str], starts: list[float], length: float,
-            voice: str, folder: Path) -> Path:
+            engine: str, voice: str, folder: Path) -> Path:
     """Speak each step's narration and lay the clips into one mono WAV of ``length`` seconds.
 
     Each clip starts at its step's start. Exits naming the step if a clip
@@ -200,8 +220,9 @@ def narrate(lines: list[str], tags: list[str], starts: list[float], length: floa
     ends = starts[1:] + [length]
     track = bytearray(2 * round(length * SAMPLE_RATE))  # 16-bit silence
     for index, (text, tag, start, end) in enumerate(zip(lines, tags, starts, ends)):
+        print(f"narration {index + 1}/{len(lines)}…", flush=True)
         clip = folder / f"voice{index:02d}.wav"
-        run(["say", "-v", voice, f"--data-format=LEI16@{SAMPLE_RATE}", "-o", str(clip), text])
+        speak(engine, voice, text, clip)
         with wave.open(str(clip)) as audio:
             if (audio.getnchannels(), audio.getsampwidth(), audio.getframerate()) != (1, 2, SAMPLE_RATE):
                 sys.exit(f"say wrote {clip.name} in an unexpected format")
@@ -242,7 +263,7 @@ def compose(raw: Path, images: list[Path], starts: list[float], length: float,
     maps = ["-map", "[out]"]
     if voice:
         # say speaks quietly; loudnorm brings it to a normal speech level.
-        graph += f";[2:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample={SAMPLE_RATE}[voice]"
+        graph += ";[2:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[voice]"
         inputs += ["-i", str(voice)]
         maps += ["-map", "[voice]", "-c:a", "aac", "-b:a", "192k"]
     run([
@@ -255,9 +276,12 @@ def main() -> None:
     """Record (unless --no-record), then compose and check the final video."""
     parser = argparse.ArgumentParser(description="Render the system video to dist/demo.mp4.")
     parser.add_argument("--no-record", action="store_true", help="reuse dist/demo-raw.mp4")
-    parser.add_argument("--voice", default=VOICE, help=f"macOS say voice (default {VOICE})")
+    parser.add_argument("--engine", choices=sorted(VOICES), default="kokoro", help="text-to-speech engine")
+    parser.add_argument("--voice", help=f"voice name (default {VOICES['kokoro']} for kokoro, "
+                                        f"{VOICES['say']} for say)")
     parser.add_argument("--no-voice", action="store_true", help="leave out the voiceover")
     options = parser.parse_args()
+    voice_name = options.voice or VOICES[options.engine]
 
     captions = read_captions(TAPE)
     narration = read_narration(TAPE)
@@ -283,12 +307,12 @@ def main() -> None:
         voice = None
         if not options.no_voice:
             tags = [tag for tag, _text in captions]
-            voice = narrate(narration, tags, starts, length, options.voice, folder)
+            voice = narrate(narration, tags, starts, length, options.engine, voice_name, folder)
         images = render_captions(captions, width, FINAL_HEIGHT - top, folder)
         compose(RAW, images, starts, length, width, top, fps, folder, voice)
 
     out_width, out_height, _ = probe(OUT)
-    spoken = "no voiceover" if options.no_voice else f"voiceover by {options.voice}"
+    spoken = "no voiceover" if options.no_voice else f"voiceover by {options.engine} {voice_name}"
     print(f"wrote {OUT.relative_to(ROOT)}: {out_width}x{out_height}, {length:.1f} s, "
           f"{len(captions)} captions, {spoken}")
     if length > LIMIT_SECONDS:
