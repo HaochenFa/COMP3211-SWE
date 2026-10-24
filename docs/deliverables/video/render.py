@@ -56,7 +56,7 @@ LIMIT_SECONDS = 240  # the brief: no more than 4 minutes
 MARKERS = {"green": (0, 255, 0), "magenta": (255, 0, 255)}
 CAPTION_LINE = re.compile(r"^# caption: (.+?) \| (.+)$")
 NARRATION_LINE = re.compile(r"^# narration: (.+)$")
-VOICES = {"kokoro": "am_michael", "say": "Samantha"}  # default voice per engine
+VOICES = {"kokoro": "am_eric", "say": "Samantha"}  # default voice per engine
 # Kokoro 0.9.4 with its dependencies as released by mid-2025: newer
 # huggingface_hub and torchvision releases break it. A uv-managed Python
 # keeps packages from another Python install (such as Anaconda) out.
