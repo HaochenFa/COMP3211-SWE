@@ -1,9 +1,10 @@
 """Render the system video (brief item 3d) to dist/demo.mp4.
 
-Three tools, one command, run from the repository root:
+Four tools, one command, run from the repository root:
 
     python3 docs/deliverables/video/render.py            # record, then compose
     python3 docs/deliverables/video/render.py --no-record  # recompose only
+    python3 docs/deliverables/video/render.py --no-record --voice Daniel
 
 1. VHS plays demo.tape against the real curses UI and writes
    dist/demo-raw.mp4. The tmux status line in that recording is a step
@@ -11,11 +12,18 @@ Three tools, one command, run from the repository root:
 2. Headless Google Chrome renders one caption bar per ``# caption:`` line
    in the tape, as a PNG. This ffmpeg build has no text filters, so text is
    drawn by the browser instead.
-3. ffmpeg crops the marker line off the recording, stacks the caption bar
-   underneath, switches captions at the marker flips, and writes
-   dist/demo.mp4 at 1920x1080.
+3. macOS ``say`` speaks each ``# narration:`` line, and the clips are laid
+   into one voiceover track, each starting where its step starts. A clip
+   that would run into the next step stops the render with the step named,
+   so the wording, not the recording, is what gets shortened.
+4. ffmpeg crops the marker line off the recording, stacks the caption bar
+   underneath, switches captions at the marker flips, adds the voiceover,
+   and writes dist/demo.mp4 at 1920x1080.
 
-Needs ``brew install vhs`` (which brings ttyd and ffmpeg) and Google Chrome.
+Needs ``brew install vhs`` (which brings ttyd and ffmpeg), Google Chrome,
+and macOS for ``say``. The default voice, Samantha, ships with macOS; a
+Premium or Enhanced voice must first be downloaded in System Settings >
+Accessibility > Spoken Content > System Voice, then passed with --voice.
 Standard library only; this script is tooling, not part of the PIM.
 """
 
@@ -28,6 +36,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import wave
 from fractions import Fraction
 from pathlib import Path
 
@@ -42,6 +51,10 @@ FINAL_HEIGHT = 1080
 LIMIT_SECONDS = 240  # the brief: no more than 4 minutes
 MARKERS = {"green": (0, 255, 0), "magenta": (255, 0, 255)}
 CAPTION_LINE = re.compile(r"^# caption: (.+?) \| (.+)$")
+NARRATION_LINE = re.compile(r"^# narration: (.+)$")
+VOICE = "Samantha"
+SAMPLE_RATE = 48000
+NARRATION_GAP = 0.4  # seconds of quiet a clip must leave before the next step
 
 CAPTION_HTML = """<!doctype html>
 <html><head><meta charset="utf-8"><style>
@@ -82,6 +95,15 @@ def read_captions(tape: Path) -> list[tuple[str, str]]:
     if not found:
         sys.exit(f"no '# caption:' lines in {tape}")
     return found
+
+
+def read_narration(tape: Path) -> list[str]:
+    """Return the text of every ``# narration: text`` line, in order."""
+    return [
+        match.group(1).strip()
+        for match in map(NARRATION_LINE.match, tape.read_text(encoding="utf-8").splitlines())
+        if match
+    ]
 
 
 def probe(video: Path) -> tuple[int, int, Fraction]:
@@ -168,9 +190,42 @@ def render_captions(captions: list[tuple[str, str]], width: int, height: int, fo
     return images
 
 
+def narrate(lines: list[str], tags: list[str], starts: list[float], length: float,
+            voice: str, folder: Path) -> Path:
+    """Speak each step's narration and lay the clips into one mono WAV of ``length`` seconds.
+
+    Each clip starts at its step's start. Exits naming the step if a clip
+    would leave less than NARRATION_GAP before the next step (or the end).
+    """
+    ends = starts[1:] + [length]
+    track = bytearray(2 * round(length * SAMPLE_RATE))  # 16-bit silence
+    for index, (text, tag, start, end) in enumerate(zip(lines, tags, starts, ends)):
+        clip = folder / f"voice{index:02d}.wav"
+        run(["say", "-v", voice, f"--data-format=LEI16@{SAMPLE_RATE}", "-o", str(clip), text])
+        with wave.open(str(clip)) as audio:
+            if (audio.getnchannels(), audio.getsampwidth(), audio.getframerate()) != (1, 2, SAMPLE_RATE):
+                sys.exit(f"say wrote {clip.name} in an unexpected format")
+            samples = audio.readframes(audio.getnframes())
+        spoken = len(samples) / 2 / SAMPLE_RATE
+        if spoken > end - start - NARRATION_GAP:
+            sys.exit(
+                f"narration {index} ({tag}) takes {spoken:.1f} s but its step is "
+                f"{end - start:.1f} s; shorten it to fit in {end - start - NARRATION_GAP:.1f} s"
+            )
+        offset = 2 * round(start * SAMPLE_RATE)
+        track[offset:offset + len(samples)] = samples
+    path = folder / "voice.wav"
+    with wave.open(str(path), "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(SAMPLE_RATE)
+        out.writeframes(bytes(track))
+    return path
+
+
 def compose(raw: Path, images: list[Path], starts: list[float], length: float,
-            width: int, top: int, fps: Fraction, folder: Path) -> None:
-    """Stack the cropped recording over the timed caption bars and encode dist/demo.mp4."""
+            width: int, top: int, fps: Fraction, folder: Path, voice: Path | None) -> None:
+    """Stack the cropped recording over the timed caption bars, add the voiceover, and encode."""
     ends = starts[1:] + [length]
     listing = folder / "captions.txt"
     lines = []
@@ -183,10 +238,16 @@ def compose(raw: Path, images: list[Path], starts: list[float], length: float,
         f"[1:v]fps={fps},format=yuv444p[band];"
         f"[term][band]vstack=shortest=1,format=yuv420p[out]"
     )
+    inputs = ["-i", str(raw), "-f", "concat", "-safe", "0", "-i", str(listing)]
+    maps = ["-map", "[out]"]
+    if voice:
+        # say speaks quietly; loudnorm brings it to a normal speech level.
+        graph += f";[2:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample={SAMPLE_RATE}[voice]"
+        inputs += ["-i", str(voice)]
+        maps += ["-map", "[voice]", "-c:a", "aac", "-b:a", "192k"]
     run([
-        "ffmpeg", "-v", "error", "-y", "-i", str(raw), "-f", "concat", "-safe", "0", "-i", str(listing),
-        "-filter_complex", graph, "-map", "[out]", "-r", str(fps), "-c:v", "libx264", "-preset", "slow",
-        "-crf", "18", "-movflags", "+faststart", str(OUT),
+        "ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", graph, *maps,
+        "-r", str(fps), "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-movflags", "+faststart", str(OUT),
     ])
 
 
@@ -194,9 +255,15 @@ def main() -> None:
     """Record (unless --no-record), then compose and check the final video."""
     parser = argparse.ArgumentParser(description="Render the system video to dist/demo.mp4.")
     parser.add_argument("--no-record", action="store_true", help="reuse dist/demo-raw.mp4")
+    parser.add_argument("--voice", default=VOICE, help=f"macOS say voice (default {VOICE})")
+    parser.add_argument("--no-voice", action="store_true", help="leave out the voiceover")
     options = parser.parse_args()
 
     captions = read_captions(TAPE)
+    narration = read_narration(TAPE)
+    # Checked before recording, so a mismatch does not cost a 4-minute take.
+    if not options.no_voice and len(narration) != len(captions):
+        sys.exit(f"{len(captions)} captions but {len(narration)} narration lines in the tape")
     if not options.no_record:
         print("recording with VHS (about 4 minutes)…", flush=True)
         run(["vhs", str(TAPE.relative_to(ROOT))], cwd=ROOT)
@@ -213,11 +280,17 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory() as tmp:
         folder = Path(tmp)
+        voice = None
+        if not options.no_voice:
+            tags = [tag for tag, _text in captions]
+            voice = narrate(narration, tags, starts, length, options.voice, folder)
         images = render_captions(captions, width, FINAL_HEIGHT - top, folder)
-        compose(RAW, images, starts, length, width, top, fps, folder)
+        compose(RAW, images, starts, length, width, top, fps, folder, voice)
 
     out_width, out_height, _ = probe(OUT)
-    print(f"wrote {OUT.relative_to(ROOT)}: {out_width}x{out_height}, {length:.1f} s, {len(captions)} captions")
+    spoken = "no voiceover" if options.no_voice else f"voiceover by {options.voice}"
+    print(f"wrote {OUT.relative_to(ROOT)}: {out_width}x{out_height}, {length:.1f} s, "
+          f"{len(captions)} captions, {spoken}")
     if length > LIMIT_SECONDS:
         sys.exit(f"too long: {length:.1f} s is over the brief's {LIMIT_SECONDS} s limit")
 
