@@ -4,7 +4,7 @@ Four tools, one command, run from the repository root:
 
     python3 docs/deliverables/video/render.py            # record, then compose
     python3 docs/deliverables/video/render.py --no-record  # recompose only
-    python3 docs/deliverables/video/render.py --no-record --voice bf_emma
+    python3 docs/deliverables/video/render.py --no-record --voice am_fenrir
     python3 docs/deliverables/video/render.py --no-record --engine say
 
 1. VHS plays demo.tape against the real curses UI and writes
@@ -56,7 +56,7 @@ LIMIT_SECONDS = 240  # the brief: no more than 4 minutes
 MARKERS = {"green": (0, 255, 0), "magenta": (255, 0, 255)}
 CAPTION_LINE = re.compile(r"^# caption: (.+?) \| (.+)$")
 NARRATION_LINE = re.compile(r"^# narration: (.+)$")
-VOICES = {"kokoro": "af_heart", "say": "Samantha"}  # default voice per engine
+VOICES = {"kokoro": "am_michael", "say": "Samantha"}  # default voice per engine
 # Kokoro 0.9.4 with its dependencies as released by mid-2025: newer
 # huggingface_hub and torchvision releases break it. A uv-managed Python
 # keeps packages from another Python install (such as Anaconda) out.

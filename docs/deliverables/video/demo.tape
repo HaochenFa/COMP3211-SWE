@@ -14,8 +14,9 @@
 #
 # Each caption line is followed by a `# narration: <text>` line: the
 # voiceover for that step, spoken by a text-to-speech voice from the moment
-# the caption appears. It is written to be heard, not read ("or" for ||, "P I R" for
-# PIR), and must finish before the next step starts; render.py checks this.
+# the caption appears. It is written as a presenter would say it while
+# demonstrating ("or" for ||, "record" for PIR; the caption carries the story
+# number), and must finish before the next step starts; render.py checks this.
 #
 # Pace: each step waits about 2 s after its caption appears before the
 # first key, so the caption can be read before anything moves.
@@ -35,7 +36,7 @@ Set Framerate 30
 Set TypingSpeed 55ms
 
 # caption: Start | Start the PIM. It opens with an empty, untitled collection.
-# narration: This is our Personal Information Manager. It starts with an empty, untitled collection.
+# narration: Hi! Let's take a quick tour of our Personal Information Manager. It opens empty.
 Hide
 Type@1ms `export BASH_SILENCE_DEPRECATION_WARNING=1; rm -rf /tmp/pim-demo && mkdir -p /tmp/pim-demo/student/Documents && ln -s "$PWD/pim.py" /tmp/pim-demo/student/Documents/pim.py && tmux -L pimdemo -f docs/deliverables/video/demo.tmux.conf new-session -s demo -c /tmp/pim-demo/student/Documents -e HOME=/tmp/pim-demo/student -e PS1='\W $ ' -e BASH_SILENCE_DEPRECATION_WARNING=1 'bash --norc --noprofile'`
 Enter
@@ -51,7 +52,7 @@ Enter
 Sleep 4s
 
 # caption: US1, US2 | Create a Note: press c, choose Note, and type the text.
-# narration: User stories one and two. Press C to create, choose Note, and type the text of the note.
+# narration: First, a note. I press C, pick Note, and just type what I want to remember.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -68,7 +69,7 @@ Enter
 Sleep 3.5s
 
 # caption: US3 | Create a Task. Its deadline is picked from a calendar, in Hong Kong time.
-# narration: User story three. A Task has a description and a deadline, which we pick from a calendar, in Hong Kong time.
+# narration: Next, a task. I give it a description, then pick the deadline from this little calendar. All times are in Hong Kong time.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -96,7 +97,7 @@ Enter
 Sleep 3.5s
 
 # caption: US4 | Create an Event with a start time and two alarms: one relative, one absolute.
-# narration: User story four. An Event has a description, a start time, and alarms. We add one alarm relative to the start, and one at an absolute time.
+# narration: Now an event, for my lecture. After the start time, I'll add two alarms: one that rings a set time before the start, and one at a fixed date and time.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -128,7 +129,7 @@ Enter
 Sleep 1.5s
 
 # caption: Alarms | An alarm that is due appears in the red bar at the top of the screen.
-# narration: When an alarm is due, it appears in the red bar at the top.
+# narration: And when an alarm comes due, it pops up in this red bar.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -139,7 +140,7 @@ Type "n"
 Sleep 5s
 
 # caption: US5 | Create a Contact with a name, an address, and a mobile number.
-# narration: User story five. A Contact has a name, an address, and a mobile number.
+# narration: Let's add a contact too: a name, an address, and a mobile number.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -161,7 +162,7 @@ Enter
 Sleep 4s
 
 # caption: US7 | Search for Events whose description contains "comp". Only the lecture matches.
-# narration: User story seven. We search for Events whose description contains "comp". Only the lecture matches.
+# narration: Now let's search. I want events whose description contains "comp"... and there's just the lecture.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -176,7 +177,7 @@ Enter
 Sleep 5s
 
 # caption: US8 | Print the selected Event, including the time each alarm will ring.
-# narration: User story eight. Printing the selected Event shows every field, and the time each alarm will ring.
+# narration: Pressing P prints the event in full, including exactly when each alarm will ring.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -189,7 +190,7 @@ Escape
 Sleep 1s
 
 # caption: US6 | Modify the Event. Enter keeps a field as it is; the start moves one day later.
-# narration: User story six. We modify the Event. Enter keeps a field unchanged, and the start moves one day later.
+# narration: Say the lecture moves a day later. Enter keeps each field as it is, so I only change the start.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -208,7 +209,7 @@ Type "n"
 Sleep 1.6s
 
 # caption: US6 | The relative alarm moved with the new start. The absolute alarm did not.
-# narration: The relative alarm moved with the new start time. The absolute alarm stayed where it was.
+# narration: Printing it again: the relative alarm moved along with the start, but the fixed one stayed put.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -221,7 +222,7 @@ Escape
 Sleep 1s
 
 # caption: US7 | Esc clears the search. The next search combines conditions with || and !.
-# narration: Escape clears the search. The next one combines conditions with "or" and "not": every Contact, or anything that does not contain "comp".
+# narration: Escape clears the search. This time I'll combine conditions with "or" and "not": every contact, plus anything that doesn't mention "comp".
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -240,7 +241,7 @@ Escape
 Sleep 1s
 
 # caption: Errors | "tomorrow" is not a valid time, so the PIM explains the error and changes nothing.
-# narration: "Tomorrow" is not a valid time. The P I M explains the error on the status line, and changes nothing.
+# narration: What if I type a time it can't understand, like "tomorrow"? It tells me what's wrong, and nothing changes.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -259,7 +260,7 @@ Escape
 Sleep 1s
 
 # caption: US8 | Print all PIRs in the current list.
-# narration: User story eight also prints every P I R in the current list, one after another.
+# narration: Capital P prints every record in the current list, so I can scroll through them all.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -274,7 +275,7 @@ Escape
 Sleep 1s
 
 # caption: US9 | Delete the selected PIR. The PIM asks for confirmation first.
-# narration: User story nine. Before it deletes the selected P I R, the P I M asks for confirmation.
+# narration: To delete a record, I select it and press X. It asks me to confirm first.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -289,7 +290,7 @@ Type "y"
 Sleep 4s
 
 # caption: US10 | Save the PIRs to a .pim file, choosing the folder in a file browser.
-# narration: User story ten. We save the collection to a dot P I M file, and choose its folder in a file browser.
+# narration: Time to save. A file browser lets me pick the folder, and I'll call the file "coursework".
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -306,7 +307,7 @@ Enter
 Sleep 4.5s
 
 # caption: US11 | Quit, start again, and load the file. The PIRs come back with the same Ids.
-# narration: User story eleven. We quit, start the P I M again, and load the file. Every P I R comes back with the same I D.
+# narration: Now I'll quit, start the app again, and open that file. Everything comes back, and each record keeps the same ID it had before.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -327,7 +328,7 @@ Enter
 Sleep 5s
 
 # caption: Ids | A new Note gets Id 5. The Id of a deleted PIR is never reused.
-# narration: A new Note gets I D five. The I D of a deleted P I R is never reused.
+# narration: A new note gets ID five. IDs are never reused, even after a delete.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
@@ -343,7 +344,7 @@ Enter
 Sleep 4.5s
 
 # caption: Unsaved | Quitting with unsaved changes asks whether to save, discard, or cancel.
-# narration: Quitting with unsaved changes asks whether to save, discard, or cancel. We save.
+# narration: If I quit with unsaved changes, it asks whether to save, discard, or cancel. I'll save.
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#ff00ff"`
@@ -356,7 +357,7 @@ Type "s"
 Sleep 3.5s
 
 # caption: Done | That covers all eleven user stories, US1 to US11.
-# narration: That covers all eleven user stories.
+# narration: And that's all eleven user stories. Thanks for watching!
 Hide
 Ctrl+B
 Type@1ms `:set -g status-style "bg=#00ff00"`
