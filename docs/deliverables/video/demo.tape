@@ -1,14 +1,28 @@
 # System video (brief 3d): the demo script from docs/BACKLOG.md, typed into
-# the real curses UI and rendered to dist/demo.mp4 (at most 4 minutes).
+# the real curses UI. Do not run this tape on its own; render.py runs it,
+# adds the caption bar, and writes dist/demo.mp4 (at most 4 minutes):
 #
 #   brew install vhs            # once; also installs ttyd
-#   vhs docs/deliverables/video/demo.tape   # from the repository root
+#   python3 docs/deliverables/video/render.py   # from the repository root
 #
-# The PIM runs inside tmux (demo.tmux.conf) so its status line can carry a
-# caption. Each caption is set while VHS is hidden. HOME is a throwaway
-# folder under /tmp, so the folder browser never shows a real home folder.
+# The PIM runs inside tmux (demo.tmux.conf). Each step starts with a
+# `# caption: <tag> | <text>` line, which render.py reads, and flips the
+# tmux status line between green and magenta while VHS is hidden. The flips
+# tell render.py where each step starts in the recording, so the number of
+# caption lines must equal the number of steps. HOME is a throwaway folder
+# under /tmp, so the folder browser never shows a real home folder.
+#
+# Each caption line is followed by a `# narration: <text>` line: the
+# voiceover for that step, spoken by a text-to-speech voice from the moment
+# the caption appears. It is written as a presenter would say it, in the
+# third person or as an instruction, never "I" ("or" for ||, "record" for
+# PIR; the caption carries the story number), and must finish before the
+# next step starts; render.py checks this.
+#
+# Pace: each step waits about 2 s after its caption appears before the
+# first key, so the caption can be read before anything moves.
 
-Output dist/demo.mp4
+Output dist/demo-raw.mp4
 
 Require tmux
 Require python3
@@ -17,319 +31,343 @@ Set Shell "bash"
 Set FontFamily "Menlo"
 Set FontSize 22
 Set Width 1920
-Set Height 1080
+Set Height 1060
 Set Padding 12
 Set Framerate 30
-Set TypingSpeed 45ms
+Set TypingSpeed 55ms
 
+# caption: Start | Start the PIM. It opens with an empty, untitled collection.
+# narration: This is a command-line Personal Information Manager. It starts with an empty collection.
 Hide
 Type@1ms `export BASH_SILENCE_DEPRECATION_WARNING=1; rm -rf /tmp/pim-demo && mkdir -p /tmp/pim-demo/student/Documents && ln -s "$PWD/pim.py" /tmp/pim-demo/student/Documents/pim.py && tmux -L pimdemo -f docs/deliverables/video/demo.tmux.conf new-session -s demo -c /tmp/pim-demo/student/Documents -e HOME=/tmp/pim-demo/student -e PS1='\W $ ' -e BASH_SILENCE_DEPRECATION_WARNING=1 'bash --norc --noprofile'`
 Enter
 Sleep 1.5s
-Ctrl+B
-Type@1ms `:set -g status-left " COMP3211 PIM  ·  a command-line Personal Information Manager  ·  Python 3.12, standard library only "`
-Enter
 Type@1ms "clear"
 Enter
 Sleep 300ms
 Show
-
-Sleep 1.5s
+Sleep 1.8s
 Type "python3 pim.py"
-Sleep 400ms
+Sleep 600ms
 Enter
-Sleep 4.5s
+Sleep 4s
 
-# --- US1, US2: Note ---------------------------------------------------------
+# caption: US1, US2 | Create a Note: press c, choose Note, and type the text.
+# narration: To create a note, press C, choose Note, and type the text.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 1/17  US1, US2  ·  Create a Note: press c, then n, then type the text "`
+Type@1ms `:set -g status-style "bg=#ff00ff"`
 Enter
 Show
-Sleep 1s
+Sleep 1.8s
 Type "c"
-Sleep 1.2s
+Sleep 1.3s
 Type "n"
-Sleep 600ms
+Sleep 900ms
 Type "Shopping: milk, eggs, bread"
-Sleep 400ms
+Sleep 500ms
 Enter
 Sleep 3.5s
 
-# --- US3: Task with a deadline ---------------------------------------------
+# caption: US3 | Create a Task. Its deadline is picked from a calendar, in Hong Kong time.
+# narration: Next, a task. After the description, the deadline is picked from a calendar, in Hong Kong time.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 2/17  US3  ·  Create a Task: the deadline is picked from a calendar in Hong Kong Time "`
+Type@1ms `:set -g status-style "bg=#00ff00"`
 Enter
 Show
-Sleep 800ms
+Sleep 1.8s
 Type "c"
-Sleep 800ms
+Sleep 900ms
 Type "t"
-Sleep 500ms
+Sleep 700ms
 Type "Submit COMP3211 SRS"
 Enter
-Sleep 1.5s
+Sleep 1.8s
 Down
-Sleep 600ms
+Sleep 700ms
 Down
-Sleep 600ms
+Sleep 700ms
 Tab
-Sleep 500ms
+Sleep 700ms
 Down
-Sleep 400ms
+Sleep 600ms
 Down
-Sleep 1s
+Sleep 1.3s
 Enter
 Sleep 3.5s
 
-# --- US4: Event with two alarms ----------------------------------------------
+# caption: US4 | Create an Event with a start time and two alarms: one relative, one absolute.
+# narration: An event has a start time and any number of alarms. This one gets two: one relative to the start, and one at a fixed time.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 3/17  US4  ·  Create an Event: a start time and two alarms, one relative and one absolute "`
+Type@1ms `:set -g status-style "bg=#ff00ff"`
 Enter
 Show
-Sleep 800ms
+Sleep 1.8s
 Type "c"
-Sleep 800ms
+Sleep 900ms
 Type "e"
-Sleep 500ms
+Sleep 700ms
 Type "COMP3211 lecture"
 Enter
+Sleep 1.8s
+Enter
 Sleep 1.5s
-Enter
-Sleep 1.2s
 Type "y"
-Sleep 1s
+Sleep 1.2s
 Type "r"
-Sleep 1.2s
+Sleep 1.5s
 Type "1"
-Sleep 1.2s
+Sleep 1.5s
 Type "y"
-Sleep 1s
+Sleep 1.2s
 Type "a"
-Sleep 1.2s
+Sleep 1.5s
 Up
-Sleep 1s
-Enter
 Sleep 1.2s
-Hide
-Ctrl+B
-Type@1ms `:set -g status-left " 4/17  Alarm Alerts  ·  OVERDUE and SOON alarms show in the program itself; d dismisses one "`
 Enter
-Show
-Type "n"
-Sleep 5.5s
+Sleep 1.5s
 
-# --- US5: Contact ------------------------------------------------------------
+# caption: Alarms | An alarm that is due appears in the red bar at the top of the screen.
+# narration: When an alarm is due, it appears in the red bar at the top.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 5/17  US5  ·  Create a Contact: name, address, and mobile number "`
+Type@1ms `:set -g status-style "bg=#00ff00"`
 Enter
 Show
-Sleep 800ms
+Sleep 1.5s
+Type "n"
+Sleep 5s
+
+# caption: US5 | Create a Contact with a name, an address, and a mobile number.
+# narration: A contact stores a name, an address, and a mobile number.
+Hide
+Ctrl+B
+Type@1ms `:set -g status-style "bg=#ff00ff"`
+Enter
+Show
+Sleep 1.8s
 Type "c"
-Sleep 800ms
+Sleep 900ms
 Type "c"
-Sleep 500ms
+Sleep 700ms
 Type "Ada Lovelace"
 Enter
-Sleep 500ms
+Sleep 700ms
 Type "1 Science Park, Sha Tin"
 Enter
-Sleep 500ms
+Sleep 700ms
 Type "91234567"
 Enter
 Sleep 4s
 
-# --- US7: search --------------------------------------------------------------
+# caption: US7 | Search for Events whose description contains "comp". Only the lecture matches.
+# narration: Search filters the list. Here, it looks for events whose description contains "comp", and only the lecture matches.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 6/17  US7  ·  Search: a type test and a contains test joined by && "`
+Type@1ms `:set -g status-style "bg=#00ff00"`
 Enter
 Show
-Sleep 800ms
+Sleep 1.8s
 Type "/"
-Sleep 1.2s
+Sleep 1.3s
 Type `type = event && description contains "comp"`
-Sleep 600ms
-Enter
-Sleep 4.5s
-
-# --- US8: print ---------------------------------------------------------------
-Hide
-Ctrl+B
-Type@1ms `:set -g status-left " 7/17  US8  ·  Print every field of the selected PIR, with each alarm's effective time "`
-Enter
-Show
 Sleep 800ms
-Type "p"
-Sleep 6.5s
-Escape
-Sleep 1s
+Enter
+Sleep 5s
 
-# --- US6: modify --------------------------------------------------------------
+# caption: US8 | Print the selected Event, including the time each alarm will ring.
+# narration: Print shows the selected event in full, including when each alarm will ring.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 8/17  US6  ·  Modify: Enter keeps a field. Move the start one day later "`
+Type@1ms `:set -g status-style "bg=#ff00ff"`
 Enter
 Show
-Sleep 800ms
-Type "m"
-Sleep 1.5s
-Enter
-Sleep 1.2s
-Right
-Sleep 1s
-Enter
-Sleep 1.2s
-Type "n"
-Sleep 1.5s
-Hide
-Ctrl+B
-Type@1ms `:set -g status-left " 9/17  US6  ·  The relative alarm moved with the start; the absolute alarm stayed "`
-Enter
-Show
+Sleep 1.8s
 Type "p"
 Sleep 7s
 Escape
 Sleep 1s
 
-# --- US7: || and ! ------------------------------------------------------------
+# caption: US6 | Modify the Event. Enter keeps a field as it is; the start moves one day later.
+# narration: Modifying goes field by field. Enter keeps a value as it is, so only the start moves, one day later.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 10/17  US7  ·  Esc shows every PIR again. Then search with || and ! "`
+Type@1ms `:set -g status-style "bg=#00ff00"`
 Enter
 Show
-Sleep 800ms
-Escape
+Sleep 1.8s
+Type "m"
+Sleep 1.6s
+Enter
+Sleep 1.3s
+Right
+Sleep 1.3s
+Enter
+Sleep 1.3s
+Type "n"
+Sleep 1.6s
+
+# caption: US6 | The relative alarm moved with the new start. The absolute alarm did not.
+# narration: Printed again, the relative alarm has moved with the new start. The fixed alarm has not.
+Hide
+Ctrl+B
+Type@1ms `:set -g status-style "bg=#ff00ff"`
+Enter
+Show
 Sleep 1.5s
+Type "p"
+Sleep 7s
+Escape
+Sleep 1s
+
+# caption: US7 | Esc clears the search. The next search combines conditions with || and !.
+# narration: Escape clears the search. Conditions can also be combined with "or" and "not": every contact, plus anything that doesn't mention "comp".
+Hide
+Ctrl+B
+Type@1ms `:set -g status-style "bg=#00ff00"`
+Enter
+Show
+Sleep 1.8s
+Escape
+Sleep 1.6s
 Type "/"
 Sleep 1s
 Type `type = contact || !(contains "comp")`
-Sleep 600ms
+Sleep 800ms
 Enter
 Sleep 5s
 Escape
 Sleep 1s
 
-# --- invalid input ------------------------------------------------------------
+# caption: Errors | "tomorrow" is not a valid time, so the PIM explains the error and changes nothing.
+# narration: An invalid time, such as "tomorrow", is rejected with a clear message, and nothing in the collection changes.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 11/17  Invalid input  ·  one clear error, no crash, nothing changed; the typed criterion stays "`
+Type@1ms `:set -g status-style "bg=#ff00ff"`
 Enter
 Show
-Sleep 800ms
+Sleep 1.8s
 Type "/"
 Sleep 1s
 Type "deadline < tomorrow"
-Sleep 500ms
+Sleep 600ms
 Enter
-Sleep 5s
+Sleep 5.5s
 Ctrl+U
 Sleep 400ms
 Escape
 Sleep 1s
 
-# --- US8: print all -----------------------------------------------------------
+# caption: US8 | Print all PIRs in the current list.
+# narration: Capital P prints every record in the current list, one after another.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 12/17  US8  ·  print all: every PIR in the Current Result "`
+Type@1ms `:set -g status-style "bg=#00ff00"`
 Enter
 Show
-Sleep 800ms
+Sleep 1.8s
 Type "P"
-Sleep 5.5s
+Sleep 5s
 PageDown
-Sleep 4.5s
+Sleep 4s
 Escape
 Sleep 1s
 
-# --- US9: delete --------------------------------------------------------------
+# caption: US9 | Delete the selected PIR. The PIM asks for confirmation first.
+# narration: Deleting a record always asks for confirmation first.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 13/17  US9  ·  Delete the selected PIR after a Yes / No question "`
+Type@1ms `:set -g status-style "bg=#ff00ff"`
 Enter
 Show
-Sleep 800ms
+Sleep 1.8s
 Up 4
-Sleep 1s
+Sleep 1.2s
 Type "x"
-Sleep 1.5s
+Sleep 1.6s
 Type "y"
 Sleep 4s
 
-# --- US10: save ---------------------------------------------------------------
+# caption: US10 | Save the PIRs to a .pim file, choosing the folder in a file browser.
+# narration: The collection is saved to a dot pim file, with a file browser for choosing the folder.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 14/17  US10  ·  Save as a .pim file from the folder browser "`
+Type@1ms `:set -g status-style "bg=#00ff00"`
 Enter
 Show
-Sleep 800ms
+Sleep 1.8s
 Type "W"
 Sleep 3.5s
 Enter
-Sleep 1s
+Sleep 1.2s
 Type "coursework"
-Sleep 500ms
+Sleep 600ms
 Enter
 Sleep 4.5s
 
-# --- US11: quit, start again, load ---------------------------------------------
+# caption: US11 | Quit, start again, and load the file. The PIRs come back with the same Ids.
+# narration: After quitting and starting the app again, the file is opened. Every record comes back with the same ID as before.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 15/17  US11  ·  Quit, start again, and load the file: the same PIRs with the same Ids "`
+Type@1ms `:set -g status-style "bg=#ff00ff"`
 Enter
 Show
-Sleep 800ms
+Sleep 1.8s
 Type "q"
-Sleep 1.5s
+Sleep 1.6s
 Type "python3 pim.py"
-Sleep 300ms
+Sleep 400ms
 Enter
 Sleep 3.5s
 Type "o"
 Sleep 3.5s
 Down
-Sleep 800ms
+Sleep 1s
 Enter
 Sleep 5s
 
+# caption: Ids | A new Note gets Id 5. The Id of a deleted PIR is never reused.
+# narration: A new note gets ID five. An ID is never reused, even after a delete.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 16/17  Ids are never reused: the new Note gets Id 5, not Id 1 "`
+Type@1ms `:set -g status-style "bg=#00ff00"`
 Enter
 Show
-Sleep 800ms
+Sleep 1.8s
 Type "c"
-Sleep 800ms
+Sleep 900ms
 Type "n"
-Sleep 500ms
+Sleep 700ms
 Type "Buy printer paper"
 Enter
 Sleep 4.5s
 
-# --- dirty quit ---------------------------------------------------------------
+# caption: Unsaved | Quitting with unsaved changes asks whether to save, discard, or cancel.
+# narration: Quitting with unsaved changes asks whether to save, discard, or cancel. Here, the changes are saved.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " 17/17  Unsaved changes: quit asks Save / Discard / Cancel and never drops them silently "`
+Type@1ms `:set -g status-style "bg=#ff00ff"`
 Enter
 Show
-Sleep 800ms
+Sleep 1.8s
 Type "q"
 Sleep 4s
 Type "s"
 Sleep 3.5s
 
+# caption: Done | That covers all eleven user stories, US1 to US11.
+# narration: That covers all eleven user stories. Thanks for watching.
 Hide
 Ctrl+B
-Type@1ms `:set -g status-left " US1 - US11 shown  ·  python3 -m unittest: every test passes, 100%% line coverage of the model package "`
+Type@1ms `:set -g status-style "bg=#00ff00"`
 Enter
 Sleep 300ms
 Type@1ms "clear"
 Enter
 Show
-Sleep 5.5s
+Sleep 5s
 
 Hide
 Type "exit"
