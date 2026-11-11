@@ -53,7 +53,7 @@ The PIM is a **single-user, command-line personal information manager**. One per
 - modify, search, print, and delete those records;
 - store the records in a file with the extension `.pim` and load them again later.
 
-All the information the user cares about is therefore kept in one place, and it survives from one run of the program to the next (US1).
+The Working Collection brings these records together. Saving it to a `.pim` file lets the user load the same records in a later run (US10–US11).
 
 ## 2.2 Scope
 

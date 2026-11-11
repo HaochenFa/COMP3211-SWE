@@ -1,7 +1,7 @@
 """Turn coverage.txt into the Markdown source of the typeset coverage report.
 
 Documentation tooling only (run by docs/build.sh): it reads the plain-text
-report that tests/coverage_report.py writes to docs/deliverables/coverage.txt
+report that tests/coverage_report.py writes to docs/04-unit-tests/coverage.txt
 and prints a Markdown document with a per-file table, the method, and the raw
 report.
 
@@ -74,7 +74,7 @@ def main(path: str, date: str) -> None:
         "python3 tests/coverage_report.py",
         "```",
         "",
-        "The command rewrites `docs/deliverables/coverage.txt` and exits with status 1 if a unit test fails or any "
+        "The command rewrites `docs/04-unit-tests/coverage.txt` and exits with status 1 if a unit test fails or any "
         "countable line of `model/` is not executed.",
         "",
         "# Report output",

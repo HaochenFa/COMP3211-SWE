@@ -1,14 +1,14 @@
-"""Build the group presentation deck, docs/presentation/PIM-presentation.pptx.
+"""Build the group presentation deck, docs/05-presentation/presentation-slides.pptx.
 
 Presentation tooling only, not part of the PIM implementation: it needs the
 third-party package python-pptx (`pip install python-pptx`). Run it from the
 repository root:
 
-    python3 docs/presentation/build_deck.py
+    python3 docs/05-presentation/build_deck.py
 
 The deck has 11 slides in four speaker sections (A–D) of about 70 seconds each,
 with a timed script in the speaker notes of every slide. Speaker A is the
-first member in docs/deliverables/group.yaml, B the second, and so on. The
+first member in docs/group.yaml, B the second, and so on. The
 top-right corner of every slide is left empty for the presenter's webcam.
 
 The two clips in docs/_media/ were cut, without sound, from the system video
@@ -39,8 +39,8 @@ from pptx.util import Inches, Pt
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 MEDIA = ROOT / "docs" / "_media"
-OUT = HERE / "PIM-presentation.pptx"
-GROUP_FILE = ROOT / "docs" / "deliverables" / "group.yaml"
+OUT = HERE / "presentation-slides.pptx"
+GROUP_FILE = ROOT / "docs" / "group.yaml"
 
 # ---------------------------------------------------------------- design tokens
 NAVY = RGBColor(0x1F, 0x3A, 0x5F)
@@ -322,7 +322,7 @@ Our PIM keeps four kinds of personal information record, or PIR: notes, tasks, e
 def slide_req_create(prs):
     s = new_slide(prs, kicker="Requirement 1 of 3", title="Creating a PIR", speaker="A", number=3)
     requirement_rows(s, MX, 2.15, 6.35, [
-        ("FR-1", "`create task` starts a record of one of exactly four types: Note, Task, Event, or Contact."),
+        ("FR-1", "`create [type]` starts a record of one of four types: Note, Task, Event, or Contact."),
         ("FR-3", "The system asks for one field at a time; pressing Enter skips an optional field."),
         ("FR-10", "A missing required field cancels the create and names the field: `description is required`."),
         ("FR-2", "The new record gets the next Id (1, 2, 3 …), and an Id is never reused."),
@@ -641,19 +641,19 @@ def slide_lesson(prs):
          size=13, color=MUTED)
     text(s, rx + 0.25, top + 2.45, w - 0.5, 1.7, [
         "Search is tested with plain `unittest` calls: no screen, no clock.",
-        "281 unit tests run in well under a second.",
+        "The model rules are tested directly, without a screen or clock.",
     ], size=14, color=INK, space_after=8, line_spacing=1.02)
     notes(s, """
 SPEAKER D · about 40 seconds
 
-That leads to our lesson, about unit testing. Search mixes field tests, time operators, missing values, and precedence, and alarms depend on the clock. Testing that through the terminal would mean scripted keystrokes and waiting for real time. So we decided early to keep every rule in the model, make the parser a plain function, and pass the current time in as an argument. The result: search is tested with plain unittest calls, and 281 unit tests cover all 800 model lines in well under a second. Our takeaway: if a rule cannot be tested through the model's interface, it is in the wrong place.
+That leads to our lesson about unit testing. Search mixes field tests, time operators, missing values, and precedence, and alarms depend on the clock. Testing that through the terminal would mean scripted keystrokes and waiting for real time. So we keep each rule in the model, expose the parser as a plain function, and pass the current time in as an argument. That lets unit tests check search and alarms directly, without the screen or the wall clock. Our takeaway: if a rule cannot be tested through the model's interface, it is in the wrong place.
 """)
 
 
 def slide_summary(prs):
     s = new_slide(prs, kicker="Summary", title="What we built and what we learned", speaker="D", number=11)
     stats = [("11 / 11", "user stories implemented"), ("53 / 53", "SRS requirements implemented"),
-             ("341", "automated tests, all passing"), ("100 %", "line coverage of model")]
+             ("800 / 800", "countable model lines covered"), ("4", "PIR types")]
     w, gap = 2.85, 0.2
     for i, (big, small) in enumerate(stats):
         x = MX + i * (w + gap)
@@ -675,7 +675,7 @@ def slide_summary(prs):
     notes(s, """
 SPEAKER D · about 10 seconds
 
-To sum up: all eleven user stories and every requirement in our SRS are implemented, the 341 tests pass, and the model is fully covered. Thank you for watching.
+To sum up: all eleven user stories and every requirement in our SRS are implemented, and the unit tests execute every countable model line. Thank you for watching.
 """)
 
 

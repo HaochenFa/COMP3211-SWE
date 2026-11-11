@@ -2,15 +2,15 @@
 
 Durable instruction set for AI agents working in this repository.
 
-This is not a quick-start and not an implementation snapshot. User-facing overview is `README.md`. Requirements are locked in the SRS and the design in the design document (`docs/deliverables/`). If this file and those documents diverge, fix this file — do not silently “improve” the product.
+This is not a quick-start and not an implementation snapshot. User-facing overview is `README.md`. Requirements are locked in the SRS (`docs/01-requirements/`) and the design document (`docs/02-design/`). If this file and those documents diverge, fix this file — do not silently “improve” the product.
 
 ## Precedence
 
 If anything conflicts, follow this order:
 
 1. `Project Description.pdf` (the COMP3211 brief, at the repository root; cannot be waived)
-2. `docs/deliverables/SRS.md` (requirements and glossary)
-3. `docs/deliverables/DESIGN.md` (architecture, classes, file format; §5 design decisions)
+2. `docs/01-requirements/SRS.md` (requirements and glossary)
+3. `docs/02-design/DESIGN.md` (architecture, classes, file format; §5 design decisions)
 4. `CLAUDE.md`
 5. `README.md`
 
@@ -23,10 +23,10 @@ python3 pim.py                                      # curses UI on a TTY
 PIM_NO_CURSES=1 python3 pim.py                      # line UI (what tests drive)
 python3 -m unittest                                 # all three layers
 python3 -m unittest discover -s tests/unit -t .     # or tests/integration, tests/e2e
-python3 tests/coverage_report.py                    # writes docs/deliverables/coverage.txt; must be 100% of model/
+python3 tests/coverage_report.py                    # writes docs/04-unit-tests/coverage.txt; must be 100% of model/
 git config core.hooksPath hooks                     # once per clone: enable the gate
-sh docs/build.sh                                    # typeset PDFs into the repository root (needs pandoc, xelatex, mmdc)
-python3 docs/presentation/build_deck.py             # presentation deck (needs python-pptx)
+sh docs/build.sh                                    # typeset PDFs into the repository root (needs pandoc, mmdc, Chrome, and xelatex or tectonic)
+python3 docs/05-presentation/build_deck.py           # presentation deck (needs python-pptx)
 ```
 
 ## Project intent
@@ -67,7 +67,7 @@ If a user or another agent asks for an out-of-scope feature, refuse it against t
 | Scope, fields, search grammar, interaction, error rules | SRS §2 and §6 (FR-1 – FR-43, NFR-1 – NFR-10) |
 | Packages, `PIM` interface, PIM File JSON, event loop | DESIGN §2–§3 |
 | Why a choice was made | DESIGN §5 |
-| Which requirement each test covers | `docs/deliverables/REQUIREMENTS.md`, and the *Verification* lines in the SRS |
+| Which requirement each test covers | `docs/03-implementation/REQUIREMENTS.md`, and the *Verification* lines in the SRS |
 | Test fixture | `tests/fixture.py` |
 | Demo script | `tests/e2e/test_demo.py` (the scripted demo session) |
 
@@ -117,7 +117,7 @@ Use the SRS glossary terms as written. Forbidden substitutions:
 - Each test must state the behaviour it exercises (name or comment) and assert expected results.
 - Cover: four types create/validate/modify/delete; Id stability; contains / unqualified contains / missing-field time / and-or-not / multi-alarm; save/load round-trip; `due_alarms` with injected `now`; dirty flag; corrupt file does not clobber memory.
 - Prefer the shared fixture in `tests/fixture.py`.
-- `python3 tests/coverage_report.py` writes the line-coverage report for `model/` to `docs/deliverables/coverage.txt`. Its typeset copy, `COVERAGE_REPORT.pdf`, is the report the brief requires at the source root.
+- `python3 tests/coverage_report.py` writes the line-coverage report for `model/` to `docs/04-unit-tests/coverage.txt`. Its typeset copy, `COVERAGE_REPORT.pdf`, is the report the brief requires at the source root.
 - Pre-commit (`hooks/pre-commit`): unit tests at 100% `model/` coverage, then integration, then e2e, or the commit is refused. `git config core.hooksPath hooks`. Bypass: `git commit --no-verify`.
 
 ## Agent working rules
@@ -125,15 +125,15 @@ Use the SRS glossary terms as written. Forbidden substitutions:
 - Implement the locked design. Do not “simplify” by collapsing MVC, swapping JSON for pickle, or blocking on `input()`.
 - Do not start coding a new PIR type, a fifth package, or a TUI framework to make the UI “nicer”.
 - When implementing, keep `model` the test surface: if a rule cannot be tested through `PIM` / Criterion, it is in the wrong package.
-- If you must choose a detail not in the docs (e.g. exact menu keystrokes), pick the smallest option that still satisfies acceptance, and record it as a row in the matching table of `docs/deliverables/DESIGN.md` §5 (decision, why, rejected) only if it is hard to reverse, surprising, and a real trade-off.
+- If you must choose a detail not in the docs (e.g. exact menu keystrokes), pick the smallest option that still satisfies acceptance, and record it as a row in the matching table of `docs/02-design/DESIGN.md` §5 (decision, why, rejected) only if it is hard to reverse, surprising, and a real trade-off.
 - Keep the SRS glossary domain-only: no implementation types, file paths, or Python names.
 - Do not change a requirement in the SRS or a decision in DESIGN §5 unless the user explicitly changes a product decision. Do keep both documents true to the code: when behaviour, a class, or a public method changes, update the SRS, DESIGN §3, `REQUIREMENTS.md`, and the manuals in the same change.
 - Do not add separate product, architecture, acceptance, or glossary files; the SRS and the design document are the only specifications.
 - Do not add dated plan files or separate decision records (ADRs).
 - Honour Declaration: GenAI use is allowed if acknowledged. Do not invent a false “no GenAI” claim. Contribution splits are the group’s, not the agent’s.
-- Every document source lives under `docs/`: the graded Markdown and `coverage.txt` in `docs/deliverables/`, the deck source in `docs/presentation/`, and supporting material in the underscore folders (`docs/_diagrams/`, `docs/_typeset/`, `docs/_video/`, `docs/_media/`). The root holds only `README.md`, this file, the brief, and the submitted PDFs: `SRS.pdf`, `DESIGN_REPORT.pdf`, `USER_MANUAL.pdf`, `DEVELOPER_MANUAL.pdf`, `REQUIREMENTS.pdf`, `COVERAGE_REPORT.pdf`, and `Presentation Slides.pdf`. The brief requires the requirements coverage report and the line-coverage report in the root folder of the source code; `REQUIREMENTS.pdf` and `COVERAGE_REPORT.pdf` are those. Do not add other documents at the root.
-- The SRS, DESIGN, manuals, and `REQUIREMENTS.md` are graded as PDFs. Keep repo-only notes in `<!-- -->` comments (pandoc drops them), and never cite files a grader won't have. After changing a document, rebuild it (`sh docs/build.sh SRS`, named by source file) and look at its PDF at the root: the dash counts in a pipe table's separator row set the column widths. The typeset PDFs are tracked in git; commit them with the Markdown change. The page design lives in `docs/_typeset/`; title-page details (group number, members) in `docs/deliverables/group.yaml`.
-- `hooks/pre-commit` rewrites `docs/deliverables/coverage.txt`. If it changes, commit it with the change that caused it.
+- Every document source lives under `docs/`, grouped in assignment order: SRS in `docs/01-requirements/`, design in `docs/02-design/`, manuals and requirements coverage in `docs/03-implementation/`, line coverage in `docs/04-unit-tests/`, and slides in `docs/05-presentation/`. Shared title-page details are in `docs/group.yaml`; supporting material is in the underscore folders. The root holds only `README.md`, this file, the brief, and the submitted PDFs: `SRS.pdf`, `DESIGN_REPORT.pdf`, `USER_MANUAL.pdf`, `DEVELOPER_MANUAL.pdf`, `REQUIREMENTS.pdf`, `COVERAGE_REPORT.pdf`, and `Presentation Slides.pdf`. The brief requires the requirements coverage report and the line-coverage report in the root folder of the source code; `REQUIREMENTS.pdf` and `COVERAGE_REPORT.pdf` are those. Do not add other documents at the root.
+- The SRS, DESIGN, manuals, and `REQUIREMENTS.md` are graded as PDFs. Keep repo-only notes in `<!-- -->` comments (pandoc drops them), and never cite files a grader won't have. After changing a document, rebuild it (`sh docs/build.sh SRS`, named by source file) and look at its PDF at the root: the dash counts in a pipe table's separator row set the column widths. The typeset PDFs are tracked in git; commit them with the Markdown change. The page design lives in `docs/_typeset/`; title-page details (group number, members) are in `docs/group.yaml`.
+- `hooks/pre-commit` rewrites `docs/04-unit-tests/coverage.txt`. If it changes, commit it with the change that caused it.
 - To stage a file already removed with `git rm`, use `git add -A -- <paths>`. A plain `git add` of that path fails and aborts an `&&` chain.
 - To try the curses UI by hand, run it under tmux with `HOME` set to a temporary folder, so the folder browser and `~` paths don't touch your real home folder.
 

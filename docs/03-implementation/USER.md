@@ -32,7 +32,7 @@ You need a Mac with Python 3.12 or newer. Open Terminal (or iTerm), go to the fo
 python3 pim.py
 ```
 
-The program chooses its interface by itself:
+The program selects an interface based on the terminal:
 
 - In an interactive terminal it opens the **full-screen interface**, which you work mostly with single keys, selectors, and a calendar.
 - When its input or output is redirected (for example `python3 pim.py < commands.txt`), it uses the **line interface**: it prints the screen as text and reads one command per line. You can also ask for the line interface with `PIM_NO_CURSES=1 python3 pim.py`.

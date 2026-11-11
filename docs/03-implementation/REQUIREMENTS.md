@@ -16,9 +16,9 @@ This report states which user stories of Appendix B and which requirements of th
 |----------------------------------------|----------|----------------|------------------|
 | User stories (Appendix B) | 11 | 11 | 0 |
 | Functional requirements (FR-1 – FR-43) | 43 | 43 | 0 |
-| Non-functional requirements (NFR-1 – NFR-10) | 10 | 10 | 0 |
+| Non-functional requirements (NFR-1 – NFR-10) | 10 | 9 | 1 |
 
-The evidence column names the automated tests that check each item. All 341 tests pass with `python3 -m unittest` (8 November 2026), and the model unit tests execute all 800 countable lines of `model/` (`coverage.txt`). Test files are in `tests/unit`, `tests/integration`, and `tests/e2e`.
+The evidence column names the automated tests that check each item. Test files are in `tests/unit`, `tests/integration`, and `tests/e2e`; model line coverage is reported separately in `docs/04-unit-tests/coverage.txt`.
 
 # 2. User stories
 
@@ -97,15 +97,15 @@ The user-interface requirements FR-38 – FR-40 serve every story.
 | NFR-5 | Atomic save; failed load keeps memory; no silent loss of changes | Implemented | `unit/test_persist.py`; `unit/test_terminal.py`; `e2e/test_commands.py` |
 | NFR-6 | Time-zone-aware instants, HKT by default, UTC+8 without a time-zone database | Implemented | `unit/test_pir.py` (`ParseDatetimeTests`) |
 | NFR-7 | Search, alarm check, save, and load each under 1 s with 10,000 PIRs | Implemented | measured on 24 Sep 2026: 2 ms, 2 ms, 44 ms, 24 ms |
-| NFR-8 | Model unit tests with `unittest`, 100 % line coverage of `model/` | Implemented | `coverage.txt` (800 of 800 lines) |
+| NFR-8 | Model unit tests with `unittest`, 100 % line coverage of `model/` | Not implemented | One failing assertion in `test_json_too_deep_or_too_long_is_not_a_pim_file`; `coverage.txt` still shows 800 of 800 lines |
 | NFR-9 | English text; errors name the field or value | Implemented | `unit/test_pir.py` and the error tests; the user manual, Section 11 |
 | NFR-10 | No out-of-scope features | Implemented | inspection against SRS Section 2.2 |
 
 # 5. Not implemented
 
-No user story or requirement is left unimplemented. The features listed as out of scope in SRS Section 2.2 (a graphical interface, recurring events, links between PIRs, operating-system notifications, and third-party terminal libraries) are absent by design.
+All 11 user stories and all 43 functional requirements are implemented. NFR-8 is not fully met: `python3 -m unittest` currently has one failing assertion in `test_json_too_deep_or_too_long_is_not_a_pim_file` (`tests/unit/test_persist.py`), where the expected and actual error messages differ. The unit tests still execute all 800 countable lines of `model/`, but the test suite must pass before NFR-8 can be marked implemented. The features listed as out of scope in SRS Section 2.2 (a graphical interface, recurring events, links between PIRs, operating-system notifications, and third-party terminal libraries) are absent by design.
 
 # 6. How the evidence was produced
 
 - `python3 -m unittest` runs all three test layers.
-- `python3 tests/coverage_report.py` writes `docs/deliverables/coverage.txt`, typeset as `COVERAGE_REPORT.pdf`. It uses the standard-library `trace` module over `tests/unit` and counts the lines on which a statement starts in each file of `model/` except `__init__.py`. The method is stated at the top of `coverage.txt`.
+- `python3 tests/coverage_report.py` writes `docs/04-unit-tests/coverage.txt`, typeset as `COVERAGE_REPORT.pdf`. It uses the standard-library `trace` module over `tests/unit` and counts the lines on which a statement starts in each file of `model/` except `__init__.py`. The method is stated at the top of `coverage.txt`.

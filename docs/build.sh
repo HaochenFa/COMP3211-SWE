@@ -1,7 +1,6 @@
 #!/bin/sh
-# Typeset the course documents as PDFs. The sources (SRS.md, DESIGN.md,
-# USER.md, DEVELOPER.md, REQUIREMENTS.md, coverage.txt) live in
-# docs/deliverables/; every PDF is written to the source root:
+# Typeset the course documents as PDFs. Sources are grouped under docs/ in
+# assignment order; every PDF is written to the source root:
 #
 #   SRS.pdf  DESIGN_REPORT.pdf  USER_MANUAL.pdf  DEVELOPER_MANUAL.pdf
 #   REQUIREMENTS.pdf  COVERAGE_REPORT.pdf
@@ -14,7 +13,7 @@
 # tables, requirement blocks), filter.lua (turns the Markdown into those LaTeX
 # structures), and mermaid.json (diagram theme). Diagram sources are in
 # docs/_diagrams/. Title-page details (group number, members) come from
-# docs/deliverables/group.yaml.
+# docs/group.yaml.
 #
 # Documentation tooling only: it is not part of the PIM implementation, so the
 # standard-library-only rule does not apply. Needs pandoc 3, XeLaTeX (MacTeX),
@@ -26,16 +25,28 @@
 
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-DOCS="$ROOT/docs/deliverables"
+REQUIREMENTS="$ROOT/docs/01-requirements"
+DESIGN="$ROOT/docs/02-design"
+IMPLEMENTATION="$ROOT/docs/03-implementation"
+TESTS="$ROOT/docs/04-unit-tests"
+GROUP="$ROOT/docs/group.yaml"
 TYPESET="$ROOT/docs/_typeset"
 DIAGRAMS="$ROOT/docs/_diagrams"
 
-for tool in pandoc xelatex mmdc python3; do
+for tool in pandoc mmdc python3; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "build: $tool not found" >&2
         exit 1
     fi
 done
+if command -v xelatex >/dev/null 2>&1; then
+    TEX_ENGINE=xelatex
+elif command -v tectonic >/dev/null 2>&1; then
+    TEX_ENGINE=tectonic
+else
+    echo "build: install XeLaTeX (MacTeX) or Tectonic" >&2
+    exit 1
+fi
 
 BUILD=$(mktemp -d "${TMPDIR:-/tmp}/pim-docs.XXXXXX")
 trap 'rm -rf "$BUILD"' EXIT
@@ -48,27 +59,44 @@ mkdir -p "$BUILD/diagrams"
 CHROME=${PUPPETEER_EXECUTABLE_PATH:-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"}
 printf '{"executablePath": "%s", "args": ["--no-sandbox"]}\n' "$CHROME" > "$BUILD/puppeteer.json"
 
-SANS=$(dirname "$(kpsewhich SourceSans3-Regular.otf)")
-{
-    for face in Regular:400 Semibold:600 Bold:700; do
-        file=${face%%:*}
-        weight=${face##*:}
-        printf '@font-face{font-family:"Source Sans 3";font-weight:%s;src:url(data:font/otf;base64,%s) format("opentype");}\n' \
-            "$weight" "$(base64 < "$SANS/SourceSans3-$file.otf" | tr -d '\n')"
-    done
-    cat "$TYPESET/mermaid.css"
-} > "$BUILD/diagram-fonts.css"
+if command -v kpsewhich >/dev/null 2>&1 && kpsewhich SourceSans3-Regular.otf >/dev/null 2>&1; then
+    SANS=$(dirname "$(kpsewhich SourceSans3-Regular.otf)")
+    {
+        for face in Regular:400 Semibold:600 Bold:700; do
+            file=${face%%:*}
+            weight=${face##*:}
+            printf '@font-face{font-family:"Source Sans 3";font-weight:%s;src:url(data:font/otf;base64,%s) format("opentype");}\n' \
+                "$weight" "$(base64 < "$SANS/SourceSans3-$file.otf" | tr -d '\n')"
+        done
+        cat "$TYPESET/mermaid.css"
+    } > "$BUILD/diagram-fonts.css"
+else
+    if ! command -v fc-match >/dev/null 2>&1; then
+        echo "build: install Source Sans 3 and fontconfig for Tectonic" >&2
+        exit 1
+    fi
+    SANS_FONT=$(fc-match -f '%{file}' "Source Sans 3")
+    if [ ! -f "$SANS_FONT" ]; then
+        echo "build: Source Sans 3 font not found" >&2
+        exit 1
+    fi
+    {
+        printf '@font-face{font-family:"Source Sans 3";font-weight:400 700;src:url(data:font/ttf;base64,%s) format("truetype");}\n' \
+            "$(base64 < "$SANS_FONT" | tr -d '\n')"
+        cat "$TYPESET/mermaid.css"
+    } > "$BUILD/diagram-fonts.css"
+fi
 
 for src in "$DIAGRAMS"/*.mmd; do
     name=$(basename "$src" .mmd)
     echo "build: diagram $name"
     mmdc -q -p "$BUILD/puppeteer.json" -c "$TYPESET/mermaid.json" -C "$BUILD/diagram-fonts.css" \
-        -i "$src" -o "$BUILD/diagrams/$name.pdf" --pdfFit -b white
+        -i "$src" -o "$BUILD/diagrams/$name.pdf" -b white
 done
 
 # ------------------------------------------------------------------ documents
 # Wrap the plain-text coverage report so it renders as a document.
-python3 "$TYPESET/coverage_doc.py" "$DOCS/coverage.txt" "$(date '+%-d %B %Y')" > "$BUILD/coverage.md"
+python3 "$TYPESET/coverage_doc.py" "$TESTS/coverage.txt" "$(date '+%-d %B %Y')" > "$BUILD/coverage.md"
 
 ONLY="$*"
 
@@ -85,17 +113,23 @@ render() {
         --to latex \
         --template="$TYPESET/template.tex" \
         --lua-filter="$TYPESET/filter.lua" \
-        --metadata-file="$DOCS/group.yaml" \
-        --resource-path="$BUILD:$DOCS:$ROOT" \
+        --metadata-file="$GROUP" \
+        --resource-path="$BUILD:$REQUIREMENTS:$DESIGN:$IMPLEMENTATION:$TESTS:$ROOT" \
         -o "$BUILD/$name.tex"
     # Three passes: contents, figure list, and the "Page n of N" footer.
-    for pass in 1 2 3; do
-        if ! (cd "$BUILD" && xelatex -interaction=nonstopmode -halt-on-error "$name.tex" > "$name.out" 2>&1); then
-            grep -E '^!' -A4 "$BUILD/$name.log" >&2 || tail -20 "$BUILD/$name.out" >&2
-            echo "build: xelatex failed on $name" >&2
-            exit 1
-        fi
-    done
+    if [ "$TEX_ENGINE" = xelatex ]; then
+        for pass in 1 2 3; do
+            if ! (cd "$BUILD" && xelatex -interaction=nonstopmode -halt-on-error "$name.tex" > "$name.out" 2>&1); then
+                grep -E '^!' -A4 "$BUILD/$name.log" >&2 || tail -20 "$BUILD/$name.out" >&2
+                echo "build: xelatex failed on $name" >&2
+                exit 1
+            fi
+        done
+    elif ! (cd "$BUILD" && tectonic --keep-logs --keep-intermediates --reruns 3 --outdir "$BUILD" "$name.tex" > "$name.out" 2>&1); then
+        tail -20 "$BUILD/$name.out" >&2
+        echo "build: tectonic failed on $name" >&2
+        exit 1
+    fi
     if grep -q 'Missing character' "$BUILD/$name.log"; then
         echo "build: warning: $name uses characters its fonts lack:" >&2
         grep 'Missing character' "$BUILD/$name.log" | sort -u >&2
@@ -103,11 +137,11 @@ render() {
     cp "$BUILD/$name.pdf" "$2"
 }
 
-render "$DOCS/SRS.md" "$ROOT/SRS.pdf"
-render "$DOCS/DESIGN.md" "$ROOT/DESIGN_REPORT.pdf"
-render "$DOCS/USER.md" "$ROOT/USER_MANUAL.pdf"
-render "$DOCS/DEVELOPER.md" "$ROOT/DEVELOPER_MANUAL.pdf"
-render "$DOCS/REQUIREMENTS.md" "$ROOT/REQUIREMENTS.pdf"
+render "$REQUIREMENTS/SRS.md" "$ROOT/SRS.pdf"
+render "$DESIGN/DESIGN.md" "$ROOT/DESIGN_REPORT.pdf"
+render "$IMPLEMENTATION/USER.md" "$ROOT/USER_MANUAL.pdf"
+render "$IMPLEMENTATION/DEVELOPER.md" "$ROOT/DEVELOPER_MANUAL.pdf"
+render "$IMPLEMENTATION/REQUIREMENTS.md" "$ROOT/REQUIREMENTS.pdf"
 render "$BUILD/coverage.md" "$ROOT/COVERAGE_REPORT.pdf"
 
 echo "build: done"

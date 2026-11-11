@@ -45,9 +45,14 @@ python3 -m compileall -q pim.py model view controller
 | `tests/integration/` | `App` against a real `PIM`, and `Terminal` against `App` and `PIM` |
 | `tests/e2e/` | Scripted terminal sessions through `Terminal.run()` |
 | `tests/fixture.py` | The shared six-PIR test collection |
-| `tests/coverage_report.py` | Writes `docs/deliverables/coverage.txt`, the line coverage of `model/` |
+| `tests/coverage_report.py` | Writes `docs/04-unit-tests/coverage.txt`, the line coverage of `model/` |
 | `hooks/pre-commit` | Git hook that refuses a commit unless all tests pass |
-| `docs/deliverables/` | The Markdown sources of the SRS, the design document, this manual, the user manual, and the requirements coverage report, and `coverage.txt` |
+| `docs/01-requirements/` | SRS source |
+| `docs/02-design/` | Design document source |
+| `docs/03-implementation/` | This manual, the user manual, and the requirements coverage report |
+| `docs/04-unit-tests/` | Line-coverage report source |
+| `docs/05-presentation/` | Slide deck source and build script |
+| `docs/group.yaml` | Group details shared by title pages and slides |
 | `docs/_diagrams/` | The diagram sources of the design document |
 | `docs/_typeset/` | The page design of the PDFs, which `docs/build.sh` builds |
 | PDF files at the root | The typeset documents, including the requirements coverage report (`REQUIREMENTS.pdf`) and the line-coverage report (`COVERAGE_REPORT.pdf`) |
@@ -124,7 +129,7 @@ The tests use only `unittest`. They inject their own input and output streams an
 python3 tests/coverage_report.py
 ```
 
-The script runs every test in `tests/unit` under the standard `trace` module and writes `docs/deliverables/coverage.txt`, the source of `COVERAGE_REPORT.pdf` at the root of the source code. A line counts when a Python statement starts on it; docstrings, comments, and the continuation lines of a statement are not counted, and `model/__init__.py`, which only re-exports names, is excluded. The exit status is 1 if a unit test fails or if any countable line of `model/` was not executed. With `--check`, as used by the commit hook, the script follows the same rules but rewrites `coverage.txt` only when coverage is 100 %.
+The script runs every test in `tests/unit` under the standard `trace` module and writes `docs/04-unit-tests/coverage.txt`, the source of `COVERAGE_REPORT.pdf` at the root of the source code. A line counts when a Python statement starts on it; docstrings, comments, and the continuation lines of a statement are not counted, and `model/__init__.py`, which only re-exports names, is excluded. The exit status is 1 if a unit test fails or if any countable line of `model/` was not executed. With `--check`, as used by the commit hook, the script follows the same rules but rewrites `coverage.txt` only when coverage is 100 %.
 
 The totals can differ slightly from those of the third-party `coverage.py`, which this project does not use.
 
@@ -140,10 +145,10 @@ Every `git commit` then runs the unit tests with the 100 % coverage check, then 
 
 # 9. Building the documents
 
-The PDF versions of the SRS, the design document, the two manuals, the requirements coverage report, and the coverage report are typeset from their Markdown sources. This step is for maintainers only and is not needed to run or test the system. It needs pandoc 3, MacTeX (XeLaTeX), mermaid-cli (`mmdc`), and Google Chrome:
+The PDF versions of the SRS, the design document, the two manuals, the requirements coverage report, and the coverage report are typeset from their Markdown sources. This step is for maintainers only and is not needed to run or test the system. It needs pandoc 3, Mermaid CLI (`mmdc`), Google Chrome, and either MacTeX (XeLaTeX) or Tectonic with Source Sans 3:
 
 ```
 sh docs/build.sh
 ```
 
-Every PDF is written to the root of the source code. The group number and member names on the title pages come from `docs/deliverables/group.yaml`.
+Every PDF is written to the root of the source code. The group number and member names on the title pages come from `docs/group.yaml`.

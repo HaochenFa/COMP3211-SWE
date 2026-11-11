@@ -33,17 +33,21 @@
   ItalicFont = * Italic,
   BoldItalicFont = * Bold Italic,
 ]
-\setsansfont{SourceSans3}[
-  Extension = .otf,
-  UprightFont = *-Regular,
-  ItalicFont = *-RegularIt,
-  BoldFont = *-Semibold,
-  BoldItalicFont = *-SemiboldIt,
-  FontFace = {sb}{n}{*-Semibold},
-  FontFace = {b}{n}{*-Bold},
-  Scale = MatchLowercase,
-  Ligatures = TeX,
-]
+\IfFileExists{SourceSans3-Regular.otf}{%
+  \setsansfont{SourceSans3}[
+    Extension = .otf,
+    UprightFont = *-Regular,
+    ItalicFont = *-RegularIt,
+    BoldFont = *-Semibold,
+    BoldItalicFont = *-SemiboldIt,
+    FontFace = {sb}{n}{*-Semibold},
+    FontFace = {b}{n}{*-Bold},
+    Scale = MatchLowercase,
+    Ligatures = TeX,
+  ]%
+}{%
+  \setsansfont{Source Sans 3}[Scale = MatchLowercase, Ligatures = TeX]%
+}
 \IfFontExistsTF{JetBrains Mono}{%
   \setmonofont{JetBrains Mono}[Scale=0.84, Ligatures=NoCommon, Contextuals=NoAlternate]%
 }{%

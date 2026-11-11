@@ -9,7 +9,7 @@ and comments are not counted.
 written only when the total is 100% so a failing gate does not dirty the
 working tree with a miss list.
 
-The report goes to `docs/deliverables/coverage.txt`, the source of the
+The report goes to `docs/04-unit-tests/coverage.txt`, the source of the
 typeset `COVERAGE_REPORT.pdf` at the repository root.
 """
 
@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MODEL = ROOT / "model"
 UNIT = ROOT / "tests" / "unit"
-REPORT = ROOT / "docs" / "deliverables" / "coverage.txt"
+REPORT = ROOT / "docs" / "04-unit-tests" / "coverage.txt"
 
 # Printed at the top of coverage.txt so a reader knows how "100%" was measured.
 METHOD = [
