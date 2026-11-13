@@ -7,7 +7,8 @@ from unittest import mock
 from view.curses_ui import CursesUI, title_bar_text
 from view.keys import CREATE, SEARCH
 from tests.unit.test_terminal import make_terminal
-from model import Note
+from controller.app import App
+from model import Note, PIM, RelativeAlarm, parse_datetime
 
 
 class CursesHelperTests(unittest.TestCase):
@@ -110,6 +111,38 @@ class CursesHelperTests(unittest.TestCase):
         self.assertEqual(ui.buffer, "type =")
         self.assertIn("criterion", term._prompt_label())
         self.assertEqual(app.status_kind, "err")
+
+    def test_inline_search_error_keeps_command_editable(self):
+        """An invalid colon search keeps the typed text and the previous search result."""
+        pim = PIM()
+        note = pim.create_note("retained")
+        pim.create_task("filtered out")
+        app, term, _out = make_terminal(app=App(pim))
+        self.assertTrue(app.search("type = note"))
+        ui = CursesUI(term, object())
+        for ch in ":search type = nothing\n":
+            ui._handle_key(ch)
+        self.assertEqual(ui.buffer, "search type = nothing")
+        self.assertTrue(ui.raw_command)
+        self.assertEqual(ui.cursor, len(ui.buffer))
+        self.assertEqual(app.current_result(), [note])
+        self.assertEqual(app.status, "search syntax error: unknown type: nothing")
+
+    def test_print_reopens_with_unchanged_output(self):
+        """The same print result opens after dismissal, from either input path."""
+        pim = PIM()
+        note = pim.create_note("read me twice")
+        app, term, _out = make_terminal(app=App(pim))
+        app.select_id(note.id)
+        ui = CursesUI(term, object())
+        for keys in ("p", "p", ":print\n", ":print all\n", ":print all\n"):
+            with self.subTest(keys=keys):
+                for ch in keys:
+                    ui._handle_key(ch)
+                self.assertTrue(ui.print_open)
+                self.assertIn("read me twice", app.print_text)
+                ui._handle_key("\x1b")
+                self.assertFalse(ui.print_open)
 
     def test_idle_escape_clears_an_active_search(self):
         """With no prompt open, Esc during an active search calls `clear` and drops the criterion."""
@@ -384,3 +417,16 @@ class DrawingTests(unittest.TestCase):
         self.assertTrue(fitted.endswith("demo.pim*"))
         self.assertLessEqual(len(fitted), 30)
         self.assertEqual(title_bar_text("PIM  untitled", 30), "PIM  untitled")
+
+    def test_long_alarm_description_leaves_time_and_count_visible(self):
+        """Trim the description before the time or remaining-alert count."""
+        now = parse_datetime("2026-11-13T19:30+08:00")
+        pim = PIM()
+        pim.create_event("long " * 50, now, [RelativeAlarm(0, "minute"), RelativeAlarm(1, "minute")])
+        _app, term, _out = make_terminal(app=App(pim), now=now)
+        self.ui._draw_alarm(mock.Mock(alarm_y=1), term.screen(), 60)
+        banner = self.screen.text(1)
+        self.assertIn("OVERDUE", banner)
+        self.assertIn("long", banner)
+        self.assertIn("2026-11-13T19:30:00+08:00", banner)
+        self.assertIn("+1 more", banner)

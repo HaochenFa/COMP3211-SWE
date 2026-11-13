@@ -4,8 +4,8 @@ The screen is an HKT lecture diary: a quiet page, a vermilion/amber
 alarm stamp, Current Result as a timetable, and the selected PIR as a
 card. Closed answers use a Chooser; datetimes use a calendar; load and
 save-as paths use a folder browser. Free text and every widget answer
-still go through ``Terminal._handle_line``. The tick is ``timeout(500)``
-so Alarm Alerts appear without a keypress.
+still go through ``Terminal._handle_line``. The input timeout allows Alarm
+Alerts to appear without a keypress.
 """
 
 from __future__ import annotations
@@ -49,6 +49,7 @@ from view.theme import (
     init_theme,
 )
 from view.file_browser import FILE, FOLDER, PARENT, FileBrowser
+from view.terminal import ALARM_POLL_MS
 from view.textwidth import clip, clip_left, display_width, input_window, wrap
 from view.widgets import WEEKDAYS, Chooser, DateTimePicker, composer_height, wrap_chips
 
@@ -124,7 +125,7 @@ class CursesUI:
         self.theme = Theme(has_color=False)
 
     def loop(self) -> None:
-        """Main loop: paint on change, ``get_wch`` with a 500ms timeout."""
+        """Paint on change and poll for alerts while waiting for input."""
         curses.curs_set(1)
         curses.noecho()
         curses.cbreak()
@@ -132,7 +133,7 @@ class CursesUI:
         # ncurses waits a full second after Esc for an escape sequence; arrow
         # keys arrive well inside 25 ms, so a lone Esc cancels at once.
         curses.set_escdelay(25)
-        self.stdscr.timeout(500)
+        self.stdscr.timeout(ALARM_POLL_MS)
         self.theme = init_theme(curses)
         if self.theme.rich:
             try:
@@ -169,8 +170,7 @@ class CursesUI:
         return chooser
 
     def _is_search_prompt(self) -> bool:
-        label = self.term._prompt_label().casefold()
-        return "criterion" in label
+        return self.term._prompt_label() == "criterion: "
 
     def _composer_h(self) -> int:
         chooser = self.term.current_chooser()
@@ -194,7 +194,7 @@ class CursesUI:
         picker = self.term.current_picker()
         pick = None
         if picker is not None:
-            pick = (picker.day.isoformat(), picker.hour, picker.minute, picker.focus, picker.view.isoformat())
+            pick = (picker.day, picker.hour, picker.minute, picker.focus, picker.view, picker.keep_initial)
         browser = self.term.current_browser()
         return (
             self.term._snapshot(),
@@ -356,10 +356,15 @@ class CursesUI:
         role = OVERDUE if first.status == "OVERDUE" else SOON
         attr = self._attr(role)
         extra = f"  +{len(screen.alarms) - 1} more" if len(screen.alarms) > 1 else ""
-        text = (
-            f" {first.status}  Id {first.event_id}  {first.description}  "
-            f"{first.when}{extra}   d dismiss"
-        )
+        prefix = f" {first.status}  Id {first.event_id}  "
+        suffix = f"  {first.when}{extra}"
+        available = width - 1 - display_width(prefix + suffix)
+        if available > 0:
+            text = prefix + clip(first.description, available) + suffix
+        else:
+            text = f"{first.status}  {first.when}{extra}"
+        if display_width(text + "   d dismiss") < width:
+            text += "   d dismiss"
         self._fill(geo.alarm_y, attr)
         self._put(geo.alarm_y, 0, clip(text, width - 1), attr)
 
@@ -564,6 +569,9 @@ class CursesUI:
                 break
             x = x0 + 2
             for day in week:
+                if day is None:
+                    x += 3
+                    continue
                 cell = f"{day.day:2d} "
                 in_month = day.month == picker.view.month
                 selected = day == picker.day
@@ -601,7 +609,7 @@ class CursesUI:
         self._put(
             summary_y,
             x0 + 2,
-            clip("Using  " + picker.summary(), inner_w),
+            clip(("Enter: " if picker.keep_initial else "Using  ") + picker.summary(), inner_w),
             self._attr(OK),
         )
         skip = "  n skip" if not picker.required else ""
@@ -668,9 +676,9 @@ class CursesUI:
         for i, line in enumerate(lines[: box_h - 2]):
             self._put(y0 + 1 + i, x0 + 2, clip(line, box_w - 4), 0)
 
-    def _safe(self, fn) -> None:
+    def _safe(self, fn):
         try:
-            fn()
+            return fn()
         except PIMError as exc:
             self.term._status(message_for(exc), "err")
         except OSError as exc:
@@ -723,11 +731,7 @@ class CursesUI:
                 self.show_help = True
                 return
             if action is not None:
-                before = self.term.app.print_text
-                self._safe(lambda: self.term.apply_accelerator(action))
-                if self.term.app.print_text and self.term.app.print_text != before:
-                    self.print_open = True
-                    self.print_scroll = 0
+                self._show_print(self._safe(lambda: self.term.apply_accelerator(action)))
                 return
         self._edit(ch)
 
@@ -737,7 +741,7 @@ class CursesUI:
         if picker is None:
             return False
         if ch in (curses.KEY_ENTER, 10, 13, "\n", "\r"):
-            self._picker_submit(picker.value())
+            self._picker_submit(picker.answer())
             return True
         if ch in (27, "\x1b"):
             self._escape()
@@ -887,11 +891,7 @@ class CursesUI:
         value = chooser.value_at(self.choice_index)
         self.buffer = ""
         self.cursor = 0
-        before = self.term.app.print_text
         self._safe(lambda: self.term._handle_line(value))
-        if self.term.app.print_text and self.term.app.print_text != before:
-            self.print_open = True
-            self.print_scroll = 0
 
     def _action(self, ch) -> str | None:
         if isinstance(ch, str):
@@ -922,18 +922,30 @@ class CursesUI:
     def _submit(self) -> None:
         line = self.buffer
         was_search = self._is_search_prompt()
+        was_command = not self.term._prompts
         self._prefill = None
         self.buffer = ""
         self.cursor = 0
         self.raw_command = False
-        before = self.term.app.print_text
-        self._safe(lambda: self.term._handle_line(line))
-        if was_search and getattr(self.term.app, "status_kind", "") == "err":
+        printed = self._safe(lambda: self.term._handle_line(line))
+        if was_search and self.term.app.status_kind == "err":
             self.buffer = line
             self.cursor = len(line)
             self.term.retry_search_prompt()
             return
-        if self.term.app.print_text and self.term.app.print_text != before:
+        if (
+            was_command
+            and line.strip().casefold().startswith("search ")
+            and self.term.app.status.startswith("search syntax error:")
+        ):
+            self.buffer = line
+            self.cursor = len(line)
+            self.raw_command = True
+            return
+        self._show_print(printed)
+
+    def _show_print(self, printed: str | None) -> None:
+        if printed is not None:
             self.print_open = True
             self.print_scroll = 0
 

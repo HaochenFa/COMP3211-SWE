@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from queue import Empty, Queue
 from typing import TYPE_CHECKING, Callable, TextIO
 
 from controller.app import HELP, STATUS_ERR, STATUS_INFO, STATUS_OK
 from controller.errors import message_for
-from model import AbsoluteAlarm, DueAlarm, PIMError, RelativeAlarm
+from model import AbsoluteAlarm, DueAlarm, Event, PIMError, RelativeAlarm
 from model.pir import KIND_ALARMS, KIND_DATETIME, HKT, pir_class
 from view.keys import (
     CREATE,
@@ -66,6 +66,8 @@ DIRTY_LOAD = "dirty-load"
 # Say which way the file goes; a bare "path: " reads the same for save and load.
 SAVE_AS_PROMPT = "save as path: "
 LOAD_PROMPT = "load path: "
+# Leave time for alarm evaluation and redraw inside the 500 ms requirement.
+ALARM_POLL_MS = 250
 
 
 class Terminal:
@@ -111,7 +113,7 @@ class Terminal:
         return True
 
     def run(self) -> None:
-        """Event loop. TTY uses curses; otherwise a stdin-reader thread + 500ms tick."""
+        """Use curses on a TTY and a queue with a polling timeout otherwise."""
         if self._use_curses():
             try:
                 import curses
@@ -125,7 +127,7 @@ class Terminal:
         self._run_line_loop()
 
     def _run_line_loop(self):
-        """Daemon stdin thread + Queue.get(timeout=0.5). Only this thread calls the model."""
+        """Read queued input with an idle alarm poll. Only this thread calls the model."""
         start_stdin_reader(self.queue, self.stdin)
         self._running = True
         self._status("Enter help for commands.", STATUS_INFO)
@@ -134,7 +136,7 @@ class Terminal:
             self._paint(force=False)
             try:
                 try:
-                    line = self.queue.get(timeout=0.5)
+                    line = self.queue.get(timeout=ALARM_POLL_MS / 1000)
                 except Empty:
                     continue
                 if line is None:
@@ -223,8 +225,8 @@ class Terminal:
             criterion_line=self.app.criterion_line() if hasattr(self.app, "criterion_line") else None,
         )
 
-    def apply_accelerator(self, action: str) -> None:
-        """Run an empty-prompt key action. Unknown names are ignored."""
+    def apply_accelerator(self, action: str) -> str | None:
+        """Run an empty-prompt action and return the output of a successful print."""
         if action not in PRINT_ACTIONS:
             self.app.clear_print()
         if action == SELECT_UP:
@@ -246,9 +248,9 @@ class Terminal:
         elif action == MODIFY:
             self._start_modify()
         elif action == PRINT:
-            self.app.print_selected()
+            return self.app.print_selected()
         elif action == PRINT_ALL:
-            self.app.print_all()
+            return self.app.print_all()
         elif action == DELETE:
             self._start_delete()
         elif action == DISMISS:
@@ -391,12 +393,12 @@ class Terminal:
             start = os.getcwd()
         self.ask(label, handler, browser=FileBrowser(mode, start))
 
-    def _handle_line(self, line: str):
+    def _handle_line(self, line: str) -> str | None:
         if self._prompts:
             item = self._prompts.pop()
             item.handler(line)
             return
-        self._handle_command(line)
+        return self._handle_command(line)
 
     def _handle_interrupt(self):
         if self._is_dirty_prompt():
@@ -432,7 +434,7 @@ class Terminal:
         self._paint(force=True)
         self._running = False
 
-    def _handle_command(self, line: str):
+    def _handle_command(self, line: str) -> str | None:
         raw = line.strip()
         if not raw:
             return
@@ -452,9 +454,9 @@ class Terminal:
         elif lower == "delete":
             self._start_delete()
         elif lower == "print":
-            self.app.print_selected()
+            return self.app.print_selected()
         elif lower == "print all":
-            self.app.print_all()
+            return self.app.print_all()
         elif lower == "save":
             self._save()
         elif lower == "save as" or lower.startswith("save as "):
@@ -605,8 +607,13 @@ class Terminal:
 
         def on_done(fields):
             updated = self.app.modify(fields)
-            if updated is not None and updated is not pir and "alarms" in fields:
-                self._forget_dismissed(pir.id)
+            if isinstance(updated, Event) and updated is not pir:
+                old_specs = [alarm.to_json() for alarm in pir.alarms]
+                new_specs = [alarm.to_json() for alarm in updated.alarms]
+                old_times = [at.astimezone(timezone.utc) for at in pir.effective_alarm_times()]
+                new_times = [at.astimezone(timezone.utc) for at in updated.effective_alarm_times()]
+                if old_specs != new_specs or old_times != new_times:
+                    self._forget_dismissed(pir.id)
 
         self._prompt_fields(type(pir).FIELDS, pir, on_done)
 
@@ -635,9 +642,13 @@ class Terminal:
             return f"{spec.label} [{current}] ({zone}): "
         return f"{spec.label} [{current}] ({zone}; empty keeps, none clears): "
 
-    def _datetime_picker(self, title: str, existing_value=None, *, required: bool) -> DateTimePicker:
+    def _datetime_picker(
+        self, title: str, existing_value=None, *, required: bool, keep_initial: bool = False
+    ) -> DateTimePicker:
         initial = existing_value if isinstance(existing_value, datetime) else None
-        return DateTimePicker(title, self._now_dt(), initial=initial, required=required)
+        return DateTimePicker(
+            title, self._now_dt(), initial=initial, required=required, keep_initial=keep_initial
+        )
 
     def _prompt_fields(self, specs, existing, on_done):
         pending = list(specs)
@@ -658,6 +669,7 @@ class Terminal:
                     f"{spec.label} · Hong Kong Time",
                     current,
                     required=spec.required,
+                    keep_initial=existing is not None,
                 )
             self.ask(
                 self._field_prompt(spec, existing),

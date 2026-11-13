@@ -102,7 +102,10 @@ class DateTimePicker:
     nudges. The line UI never sees this object — it still types the same string.
     """
 
-    def __init__(self, title: str, now: datetime, *, initial=None, required: bool = True):
+    def __init__(
+        self, title: str, now: datetime, *, initial=None, required: bool = True,
+        keep_initial: bool = False,
+    ):
         local = now.astimezone(HKT) if now.tzinfo else now.replace(tzinfo=HKT)
         self.today = local.date()
         if initial is not None:
@@ -116,30 +119,47 @@ class DateTimePicker:
         self.focus = "date"
         self.title = title
         self.required = required
+        self.keep_initial = keep_initial
+        self._has_initial = initial is not None
 
     def value(self) -> str:
         """Instant the field handler already accepts (naive → HKT)."""
         return f"{self.day.isoformat()} {self.hour:02d}:{self.minute:02d}"
 
+    def answer(self) -> str:
+        """An unchanged modify picker keeps the existing value, including an unset deadline."""
+        return "" if self.keep_initial else self.value()
+
     def summary(self) -> str:
         """Readable confirmation, not an input format."""
         weekday = WEEKDAYS[self.day.weekday()]
         month = MONTHS[self.day.month - 1]
-        return f"{weekday} {self.day.day} {month} {self.day.year}  {self.hour:02d}:{self.minute:02d}  HKT"
+        clock = f"{weekday} {self.day.day} {month} {self.day.year}  {self.hour:02d}:{self.minute:02d}  HKT"
+        if self.keep_initial:
+            return f"Keep {clock}" if self._has_initial else "Keep deadline unset (move to choose a time)"
+        return clock
 
     def month_title(self) -> str:
         """English month name and year for the grid header."""
         return f"{MONTHS[self.view.month - 1]} {self.view.year}"
 
-    def weeks(self) -> list[list[date]]:
-        """Six-or-fewer weeks covering ``view``, Monday first, including spill days."""
+    def weeks(self) -> list[list[date | None]]:
+        """Monday-first weeks, with blank cells for spill days outside years 1–9999."""
         cal = calendar.Calendar(firstweekday=calendar.MONDAY)
-        return cal.monthdatescalendar(self.view.year, self.view.month)
+        cells = [
+            date(year, month, day) if 1 <= year <= 9999 else None
+            for year, month, day, _ in cal.itermonthdays4(self.view.year, self.view.month)
+        ]
+        return [cells[i : i + 7] for i in range(0, len(cells), 7)]
 
     def move_day(self, days: int) -> None:
         """Move the highlighted day and keep the month view on it."""
-        self.day = self.day + timedelta(days=days)
+        ordinal = self.day.toordinal() + days
+        if not date.min.toordinal() <= ordinal <= date.max.toordinal():
+            return
+        self.day = date.fromordinal(ordinal)
         self.view = date(self.day.year, self.day.month, 1)
+        self.keep_initial = False
 
     def move_month(self, months: int) -> None:
         """Shift the visible month; clamp the day if the month is shorter."""
@@ -151,9 +171,12 @@ class DateTimePicker:
         while month > 12:
             month -= 12
             year += 1
+        if not 1 <= year <= 9999:
+            return
         last = calendar.monthrange(year, month)[1]
         self.day = date(year, month, min(self.day.day, last))
         self.view = date(year, month, 1)
+        self.keep_initial = False
 
     def move_time(self, minutes: int) -> None:
         """Change the clock, wrapping inside the same day."""
@@ -162,12 +185,14 @@ class DateTimePicker:
             total += 24 * 60
         self.hour = total // 60
         self.minute = total % 60
+        self.keep_initial = False
 
     def jump_today(self, now: datetime) -> None:
         """Select today's date; keep the chosen clock."""
         local = now.astimezone(HKT) if now.tzinfo else now.replace(tzinfo=HKT)
         self.day = local.date()
         self.view = date(self.day.year, self.day.month, 1)
+        self.keep_initial = False
 
     def toggle_focus(self) -> None:
         """Tab between the month grid and the time list."""
@@ -199,6 +224,8 @@ def _next_slot(local: datetime) -> tuple[date, int, int]:
         total += TIME_STEP - remainder
     day = local.date()
     if total >= 24 * 60:
+        if day == date.max:
+            return day, local.hour, local.minute
         day = day + timedelta(days=1)
         total = 0
     return day, total // 60, total % 60

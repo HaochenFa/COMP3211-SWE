@@ -273,6 +273,25 @@ class AppPersistTests(unittest.TestCase):
         missing = self.dir / "missing.pim"
         self.assertFalse(app.would_overwrite(missing))
 
+    def test_save_as_confirms_replacing_symlinks(self):
+        """Existing symlink entries require confirmation even if bound or dangling targets match."""
+        from io import StringIO
+        from view import Terminal
+
+        app = App(make_fixture())
+        bound = self.dir / "bound.pim"
+        app.save(bound)
+        term = Terminal(app, stdin=StringIO(), stdout=StringIO())
+        for name, points_to in (("alias.pim", bound), ("dangling.pim", self.dir / "missing.pim")):
+            with self.subTest(name=name):
+                target = self.dir / name
+                target.symlink_to(points_to)
+                term._handle_line(f"save as {target}")
+                self.assertIn("overwrite", term._prompt_label())
+                term._handle_line("n")
+                self.assertTrue(target.is_symlink())
+                self.assertEqual(Path(app.bound_path()), bound)
+
     def test_would_overwrite_falls_back_when_resolve_fails(self):
         """When `Path.resolve` raises OSError, `would_overwrite` falls back to a direct comparison with the Bound File."""
         app = App(make_fixture())

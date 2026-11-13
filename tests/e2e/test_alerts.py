@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import timedelta
+from queue import Empty
 from pathlib import Path
+from unittest.mock import patch
 
+from controller.app import App
 from model import PIM, parse_datetime
 from tests.e2e.harness import clock, run_script
+from view import Terminal
 
 
 class AlarmAlertTests(unittest.TestCase):
@@ -65,6 +70,39 @@ class AlarmAlertTests(unittest.TestCase):
         """`dismiss` with no Alarm Alert showing reports `no alarm to dismiss`."""
         _app, _term, out = run_script(["dismiss", "quit"])
         self.assertIn("no alarm to dismiss", out)
+
+    def test_idle_alarm_updates_without_using_the_entire_deadline_to_wait(self):
+        """An alarm becoming due just after an idle poll is painted within 500 ms."""
+        from io import StringIO
+
+        due = parse_datetime("2026-09-14 18:30")
+        elapsed = 0.0
+        painted = []
+
+        class Output(StringIO):
+            def write(self, text):
+                if "OVERDUE" in text:
+                    painted.append(elapsed)
+                return super().write(text)
+
+        class IdleInput:
+            def get(self, timeout):
+                nonlocal elapsed
+                if not elapsed:
+                    # Simulate the wait plus a small scheduling and redraw cost.
+                    elapsed = timeout + 0.010
+                    raise Empty
+                return "discard" if term._is_dirty_prompt() else "quit"
+
+        pim = PIM()
+        pim.create_event("due just after the poll", due, [{"kind": "absolute", "at": due}])
+        term = Terminal(App(pim), stdin=StringIO(), stdout=Output(),
+                        now=lambda: due + timedelta(seconds=elapsed - 0.001))
+        term.queue = IdleInput()
+        with patch("view.terminal.start_stdin_reader"):
+            term.run()
+        self.assertTrue(painted)
+        self.assertLessEqual(painted[0] - 0.001, 0.500)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,10 @@
 import unittest
 from datetime import date, datetime
 
+from controller.app import App
+from model import PIM
 from model.pir import HKT, parse_datetime
+from view.curses_ui import CursesUI
 from view.widgets import DateTimePicker, DATETIME_FORMAT
 from tests.unit.test_terminal import make_terminal
 
@@ -45,6 +48,15 @@ class DateTimePickerTests(unittest.TestCase):
         picker.move_month(1)
         self.assertEqual(picker.day, date(2026, 2, 28))
 
+    def test_december_9999_has_blank_spill_cells_and_stays_in_range(self):
+        """The last month renders normally, with no dates or navigation into year 10000."""
+        instant = hkt("9999-12-31T23:59+08:00")
+        picker = DateTimePicker("Deadline", instant, initial=instant)
+        self.assertEqual(picker.weeks()[-1][-3:], [date.max, None, None])
+        picker.move_day(1)
+        picker.move_month(1)
+        self.assertEqual(picker.day, date.max)
+
     def test_move_time_wraps_inside_the_day(self):
         """Moving the clock past 23:50 wraps to 00:05 and leaves the picker's day unchanged."""
         picker = DateTimePicker("Start", hkt("2026-09-14T23:50:00+08:00"), initial=hkt("2026-09-14T23:50:00+08:00"))
@@ -61,6 +73,29 @@ class DateTimePickerTests(unittest.TestCase):
 
 
 class DatetimePromptTests(unittest.TestCase):
+    def test_modify_enter_preserves_unset_deadline_and_original_offset(self):
+        """Enter without moving the picker is a no-op for both kinds of existing deadline."""
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+
+        for deadline in (None, "2026-11-13T11:30Z"):
+            with self.subTest(deadline=deadline), TemporaryDirectory() as tmp:
+                pim = PIM()
+                task = pim.create_task("test", deadline)
+                pim.save(Path(tmp) / "task.pim")
+                app, term, _out = make_terminal(app=App(pim), now=hkt("2026-11-13 19:30"))
+                app.select_id(task.id)
+                ui = CursesUI(term, object())
+                for ch in "m\n\n":
+                    ui._handle_key(ch)
+                self.assertIs(pim.get(task.id), task)
+                self.assertFalse(pim.is_dirty())
+                self.assertEqual(app.status, "No changes")
+                for ch in "m\nl\n":
+                    ui._handle_key(ch)
+                self.assertEqual(pim.get(task.id).deadline, hkt("2026-11-14 19:30"))
+                self.assertTrue(pim.is_dirty())
+
     def test_start_prompt_names_the_format_and_zone(self):
         """Creating an Event opens a `start` picker whose prompt names the datetime format and Hong Kong Time."""
         app, term, _out = make_terminal()

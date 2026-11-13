@@ -86,14 +86,16 @@ class App:
         except PIMError:
             return False
         bound = self.pim.bound_path()
-        if not target.exists():
+        # Match os.replace: it replaces the directory entry, even a dangling link.
+        if not os.path.lexists(target):
             return False
         if bound is None:
             return True
+        bound = Path(bound)
         try:
-            return target.resolve() != Path(bound).resolve()
+            return (target.parent.resolve(), target.name) != (bound.parent.resolve(), bound.name)
         except OSError:
-            return str(target) != str(bound)
+            return target != bound
 
     def clear_print(self) -> None:
         """Drop the last print buffer."""

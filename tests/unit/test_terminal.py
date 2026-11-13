@@ -376,6 +376,20 @@ class AlarmWizardTests(unittest.TestCase):
         feed(term, "modify", "", "", "y", "n")
         self.assertEqual(term.dismissed, {(9, 0)})
 
+    def test_dismissal_changes_only_when_the_alarm_changes(self):
+        """Reentering the same alarm keeps it dismissed; moving its effective time resets it."""
+        from controller.app import App
+        from model import PIM
+
+        pim = PIM()
+        event = pim.create_event("lecture", "2026-09-14 18:30", [RelativeAlarm(0, "minute")])
+        app, term, _out = make_terminal(app=App(pim), now=parse_datetime("2026-09-14 19:00"))
+        app.select_id(event.id)
+        feed(term, "dismiss", "modify", "New description", "", "y", "y", "relative", "0", "n")
+        self.assertEqual(term.visible_due(), [])
+        feed(term, "modify", "", "2026-09-14 18:45", "n")
+        self.assertEqual([item.at for item in term.visible_due()], [parse_datetime("2026-09-14 18:45")])
+
 
 class BrowserPromptTests(unittest.TestCase):
     """Load and save-as prompts carry a folder browser; the handler still takes a path string."""
