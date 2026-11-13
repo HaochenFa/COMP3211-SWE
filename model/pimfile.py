@@ -32,10 +32,10 @@ def _named_path(path: str | os.PathLike[str] | None) -> Path:
     # Users type `~/Desktop/x`; unexpanded, save's mkdir(parents=True) would
     # create a literal `~` folder. os.path.expanduser leaves an unknown `~user`
     # unchanged instead of raising like Path.expanduser.
-    path = Path(os.path.expanduser(str(path)))
-    if path.name.casefold() in {"", ".", ".pim"}:
+    expanded = os.path.expanduser(str(path))
+    if os.path.basename(expanded).casefold() in {"", ".", "..", ".pim"}:
         raise ValidationError("file name is required")
-    return path
+    return Path(expanded)
 
 
 def require_pim_extension(path: str | os.PathLike[str]) -> Path:

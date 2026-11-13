@@ -16,6 +16,7 @@ typeset `COVERAGE_REPORT.pdf` at the repository root.
 from __future__ import annotations
 
 import ast
+import platform
 import sys
 import traceback
 import unittest
@@ -59,7 +60,8 @@ def main() -> int:
     for (filename, lineno), n in tracer.results().counts.items():
         counts[str(Path(filename).resolve())][lineno] = n
 
-    lines = ["Line coverage for model/ (stdlib trace, tests/unit)", "", *METHOD, ""]
+    runtime = f"Python: {platform.python_implementation()} {platform.python_version()}"
+    lines = ["Line coverage for model/ (stdlib trace, tests/unit)", runtime, "", *METHOD, ""]
     grand_hit = grand_total = 0
     for path in sorted(MODEL.glob("*.py")):
         if path.name == "__init__.py":

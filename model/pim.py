@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from model.criterion import Criterion
 from model.pimfile import read_pim_file, require_pim_extension, write_pim_file
@@ -20,7 +20,6 @@ from model.pir import (
     AlarmSpec,
     Task,
     ValidationError,
-    minute_floor,
     parse_datetime,
 )
 
@@ -106,17 +105,17 @@ class PIM:
 
     def due_alarms(self, now: datetime | str) -> list[DueAlarm]:
         """OVERDUE and SOON alarms at injected `now`. Does not read the wall clock."""
-        instant = minute_floor(parse_datetime(now))
-        soon_end = instant + SOON_WINDOW
+        instant = parse_datetime(now).astimezone(timezone.utc)
         due: list[DueAlarm] = []
         for pir in self.all():
             if not isinstance(pir, Event):
                 continue
             for index, alarm in enumerate(pir.alarms):
                 at = alarm.effective(pir.start)
-                if at <= instant:
+                at_utc = at.astimezone(timezone.utc)
+                if at_utc <= instant:
                     status = "OVERDUE"
-                elif at <= soon_end:
+                elif at_utc - instant <= SOON_WINDOW:
                     status = "SOON"
                 else:
                     continue

@@ -16,6 +16,11 @@ class FixtureSearchTests(unittest.TestCase):
     def setUp(self):
         self.pim = make_fixture()
 
+    def test_excessive_parenthesis_nesting_is_a_search_error(self):
+        """Even excessive nesting is rejected as a criterion error rather than a traceback."""
+        with self.assertRaisesRegex(ParseError, "nested too deeply"):
+            parse_criterion("(" * 1200 + "type = note" + ")" * 1200)
+
     def test_type_note(self):
         """`type = note` matches only the Note, Id 1."""
         self.assertEqual(ids_for(self.pim, "type = note"), [1])

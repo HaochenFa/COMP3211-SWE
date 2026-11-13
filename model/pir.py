@@ -107,16 +107,25 @@ def require_text(value: object, field: str) -> str:
         raise ValidationError(f"{field} is required")
     if not isinstance(value, str):
         raise ValidationError(f"{field} is required")
-    return value.strip()
+    return _utf8_text(value.strip(), field)
 
 
-def optional_text(value: object) -> str | None:
+def optional_text(value: object, field: str = "text") -> str | None:
     """Strip an optional string; blank becomes None."""
     if is_blank(value):
         return None
     if not isinstance(value, str):
         return str(value)
-    return value.strip()
+    return _utf8_text(value.strip(), field)
+
+
+def _utf8_text(value: str, field: str) -> str:
+    """Reject lone surrogates, including those decoded from JSON escape sequences."""
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ValidationError(f"{field} is not valid UTF-8 text") from exc
+    return value
 
 
 def minute_floor(dt: datetime) -> datetime:
@@ -139,7 +148,7 @@ def parse_datetime(value: datetime | str, field: str = "datetime") -> datetime:
         return require_hkt_range(minute_floor(dt))
     if is_blank(value) or not isinstance(value, str):
         raise ValidationError(f"{field} is required")
-    raw = value.strip()
+    raw = _utf8_text(value.strip(), field)
     if raw.casefold() == CLEAR:
         raise ValidationError(f"{field} is required")
     text = raw
@@ -194,7 +203,8 @@ def parse_alarm(spec: AlarmSpec) -> RelativeAlarm | AbsoluteAlarm:
         return spec
     if not isinstance(spec, dict):
         raise ValidationError("invalid alarm")
-    kind = str(spec.get("kind", "")).casefold()
+    kind = spec.get("kind", "")
+    kind = kind.casefold() if isinstance(kind, str) else ""
     if kind == "relative":
         return RelativeAlarm(spec.get("amount"), spec.get("unit"))
     if kind == "absolute":
@@ -219,7 +229,10 @@ def _alarm_amount(value: object) -> int:
     if isinstance(value, int) and not isinstance(value, bool):
         return value
     if isinstance(value, str) and re.fullmatch(r"\s*-?[0-9]+\s*", value):
-        return int(value)
+        try:
+            return int(value)
+        except ValueError as exc:
+            raise ValidationError("alarm time is out of range") from exc
     raise ValidationError("relative alarm amount must be an integer")
 
 
@@ -242,7 +255,9 @@ class RelativeAlarm:
 
     def effective(self, start: datetime) -> datetime:
         """`start` minus the stored duration (0 = at start)."""
-        return start - RELATIVE_UNITS[self.unit] * self.amount
+        at = start.astimezone(timezone.utc) - RELATIVE_UNITS[self.unit] * self.amount
+        # The stored start keeps its offset on reload, so use that offset for display.
+        return at.astimezone(timezone(start.utcoffset()))
 
     def to_json(self) -> dict:
         """JSON object with kind, amount, and unit."""
@@ -283,8 +298,8 @@ def check_alarm_times(start: datetime, alarms: list[RelativeAlarm | AbsoluteAlar
     """
     for alarm in alarms:
         try:
-            alarm.effective(start)
-        except OverflowError as exc:
+            require_hkt_range(alarm.effective(start))
+        except (OverflowError, ValidationError) as exc:
             raise ValidationError("alarm time is out of range") from exc
 
 
@@ -596,8 +611,8 @@ class Contact(PIR):
     ):
         super().__init__(pir_id)
         self.name = require_text(name, "name")
-        self.address = optional_text(address)
-        self.mobile = optional_text(mobile)
+        self.address = optional_text(address, "address")
+        self.mobile = optional_text(mobile, "mobile")
 
     @property
     def display_name(self) -> str:
@@ -626,11 +641,11 @@ class Contact(PIR):
         if "name" in fields:
             new_name = require_text(fields["name"], "name")
         if "address" in fields:
-            new_address = optional_text(fields["address"])
+            new_address = optional_text(fields["address"], "address")
             if isinstance(fields["address"], str) and fields["address"].strip().casefold() == CLEAR:
                 new_address = None
         if "mobile" in fields:
-            new_mobile = optional_text(fields["mobile"])
+            new_mobile = optional_text(fields["mobile"], "mobile")
             if isinstance(fields["mobile"], str) and fields["mobile"].strip().casefold() == CLEAR:
                 new_mobile = None
         self.name = new_name
@@ -675,13 +690,19 @@ def pir_from_json(data: dict[str, object]) -> PIR:
     # Ids are positive integers in the file; 1.7, "3", true, and -3 are not coerced.
     if not is_positive_int(pir_id):
         raise FileFormatError("PIR is missing a valid id")
-    type_name = str(data.get("type", "")).casefold()
-    if type_name == "note":
-        return Note(pir_id, data.get("text"))
-    if type_name == "task":
-        return Task(pir_id, data.get("description"), data.get("deadline"))
-    if type_name == "event":
-        return Event(pir_id, data.get("description"), data.get("start"), data.get("alarms"))
-    if type_name == "contact":
-        return Contact(pir_id, data.get("name"), data.get("address"), data.get("mobile"))
-    raise FileFormatError(f"unknown PIR type: {data.get('type')!r}")
+    type_name = data.get("type")
+    if not isinstance(type_name, str):
+        raise FileFormatError("PIR type must be a string")
+    cls = pir_class(type_name)
+    if cls is None:
+        raise FileFormatError(f"unknown PIR type: {type_name!r}")
+    fields = {}
+    for spec in cls.FIELDS:
+        value = data.get(spec.key)
+        if spec.kind == KIND_ALARMS:
+            if spec.key in data and not isinstance(value, list):
+                raise FileFormatError("alarms must be a list")
+        elif value is not None and not isinstance(value, str):
+            raise FileFormatError(f"{spec.key} must be a string")
+        fields[spec.key] = value
+    return cls(pir_id, **fields)

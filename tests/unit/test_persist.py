@@ -3,14 +3,17 @@
 import json
 import tempfile
 import unittest
+from datetime import timezone
 from pathlib import Path
 from unittest.mock import patch
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from model import (
     DirtyLoadError,
     ExtensionError,
     FileFormatError,
     PIM,
+    RelativeAlarm,
     ValidationError,
     parse_datetime,
 )
@@ -107,23 +110,78 @@ class PersistTests(unittest.TestCase):
         self.assertEqual(pim.get(1).text, "Shopping: Milk")
 
     def test_json_too_deep_or_too_long_is_not_a_pim_file(self):
-        """FR-36: JSON nested too deeply, or an integer past Python's digit limit,
-        is reported as `not a PIM file: file is not valid JSON`; memory keeps its 6 PIRs."""
+        """FR-36: reject oversized JSON or an invalid root without replacing the collection."""
         pim = make_fixture()
+        before = [pir.to_json() for pir in pim.all()]
         cases = {
-            "deep.pim": "[" * 100_000 + "]" * 100_000,
-            "long.pim": '{"format": "pim/v1", "next_id": ' + "9" * 5000 + ', "pirs": []}',
+            # Python 3.15 can decode this root array, but it is still not a PIM file.
+            "deep.pim": ("[" * 100_000 + "]" * 100_000, None),
+            "long.pim": ('{"format": "pim/v1", "next_id": ' + "9" * 5000 + ', "pirs": []}',
+                         "file is not valid JSON"),
         }
-        for name, text in cases.items():
+        for name, (text, reason) in cases.items():
             with self.subTest(name=name):
                 path = self.dir / name
                 path.write_text(text, encoding="utf-8")
                 with self.assertRaises(FileFormatError) as ctx:
                     pim.load(path, force=True)
-                self.assertEqual(
-                    ctx.exception.status_message(), "not a PIM file: file is not valid JSON"
-                )
-                self.assertEqual(len(pim.all()), 6)
+                self.assertTrue(ctx.exception.status_message().startswith("not a PIM file: "))
+                if reason:
+                    self.assertEqual(str(ctx.exception), reason)
+                self.assertEqual([pir.to_json() for pir in pim.all()], before)
+
+    def test_load_rejects_invalid_fields_before_replacing_dirty_collection(self):
+        """Reject null alarm lists, malformed field types, and escaped lone surrogates."""
+        pim = make_fixture()
+        path = self.dir / "bad.pim"
+        event = {"type": "event", "description": "x", "start": "2026-11-13 09:00"}
+        cases = (
+            ({**event, "alarms": None}, "alarms must be a list"),
+            ({"type": "note", "text": "x\ud800"}, "text is not valid UTF-8 text"),
+            ({"type": "contact", "name": "Ada", "mobile": "x\ud800"}, "mobile is not valid UTF-8 text"),
+            ({"type": "task", "description": "x", "deadline": {}}, "deadline must be a string"),
+            ({"type": "task", "description": "x", "deadline": "\ud800"}, "datetime is not valid UTF-8 text"),
+            ({"type": []}, "PIR type must be a string"),
+            ({**event, "alarms": [{"kind": "relative", "unit": "hour", "amount": "9" * 5000}]},
+             "alarm time is out of range"),
+        )
+        before = [pir.to_json() for pir in pim.all()]
+        for record, reason in cases:
+            with self.subTest(reason=reason):
+                payload = {"format": "pim/v1", "next_id": 2, "pirs": [{"id": 1, **record}]}
+                path.write_text(json.dumps(payload), encoding="utf-8")
+                with self.assertRaisesRegex(FileFormatError, reason):
+                    pim.load(path, force=True)
+                self.assertEqual([pir.to_json() for pir in pim.all()], before)
+                self.assertTrue(pim.is_dirty())
+                self.assertIsNone(pim.bound_path())
+
+    def test_relative_alarm_across_clock_change_round_trips_as_an_instant(self):
+        """A one-day offset crosses Hong Kong's 1979 clock change as exactly 24 hours."""
+        try:
+            hkt = ZoneInfo("Asia/Hong_Kong")
+        except ZoneInfoNotFoundError:
+            self.skipTest("no Hong Kong timezone data")
+        pim = PIM()
+        start = parse_datetime("1979-10-21T18:00").replace(tzinfo=hkt)
+        event = pim.create_event("clock change", start, [RelativeAlarm(1, "day")])
+        expected = parse_datetime("1979-10-20T10:00Z")
+        self.assertEqual(event.effective_alarm_times()[0].astimezone(timezone.utc), expected)
+        path = self.dir / "historical.pim"
+        pim.save(path)
+        pim.load(path)
+        self.assertEqual(pim.get(event.id).effective_alarm_times()[0].astimezone(timezone.utc), expected)
+
+    def test_directory_only_path_is_not_a_filename(self):
+        """A trailing slash or dot is a missing filename, not an instruction to create a sibling."""
+        pim = make_fixture()
+        folder = self.dir / "folder"
+        folder.mkdir()
+        for path in (f"{folder}/", f"{folder}/.", f"{folder}/.."):
+            with self.subTest(path=path), self.assertRaisesRegex(ValidationError, "file name is required"):
+                pim.save(path)
+        self.assertEqual(list(self.dir.iterdir()), [folder])
+        self.assertTrue(pim.is_dirty())
 
     def test_failed_replace_keeps_earlier_file_and_leaves_no_temp(self):
         """FR-32/NFR-5: when the atomic replace fails, the earlier file keeps its content,

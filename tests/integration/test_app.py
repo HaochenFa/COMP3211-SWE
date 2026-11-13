@@ -18,6 +18,16 @@ def ids_of(app: App):
 
 
 class AppCreateModifyDeleteTests(unittest.TestCase):
+    def test_long_search_stays_safe_after_creating_the_first_record(self):
+        """A long disjunction accepted on an empty collection can still match a new Note."""
+        app = App(PIM())
+        self.assertTrue(app.search(" || ".join(["type = note"] * 1200)))
+        self.assertEqual(ids_of(app), [])
+        note = app.create("note", {"text": "new"})
+        self.assertEqual(ids_of(app), [note.id])
+        self.assertEqual(app.selected_id(), note.id)
+        self.assertEqual(app.status, "Created Note Id 1")
+
     def test_create_four_types_selects_and_lists_them(self):
         """US1: creating one of each PIR type selects the last one, lists all four, and leaves it dirty."""
         app = App(PIM())

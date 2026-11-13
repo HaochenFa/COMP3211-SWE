@@ -5,13 +5,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from model.pir import PIR, ParseError, TYPE_NAMES, parse_datetime
 
 TEXT_FIELDS = frozenset({"text", "description", "name", "address", "mobile"})
 TIME_FIELDS = frozenset({"deadline", "start", "alarm"})
 OPS = {"=": lambda a, b: a == b, "<": lambda a, b: a < b, ">": lambda a, b: a > b}
+MAX_NESTING = 100
 
 
 class Criterion:
@@ -70,7 +71,7 @@ class TimeCompare(Criterion):
             raise ParseError(f"unknown comparison: {op}")
         self.field = key
         self.op = op
-        self.instant = instant
+        self.instant = parse_datetime(instant).astimezone(timezone.utc)
 
     def matches(self, pir: PIR) -> bool:
         """True when any instant of the field satisfies the comparison; false if the PIR has none."""
@@ -78,7 +79,7 @@ class TimeCompare(Criterion):
         if not values:
             return False
         compare = OPS[self.op]
-        return any(compare(value, self.instant) for value in values)
+        return any(compare(value.astimezone(timezone.utc), self.instant) for value in values)
 
 
 class And(Criterion):
@@ -90,7 +91,7 @@ class And(Criterion):
 
     def matches(self, pir: PIR) -> bool:
         """True when both sub-criteria match."""
-        return self.left.matches(pir) and self.right.matches(pir)
+        return _matches_tree(self, pir)
 
 
 class Or(Criterion):
@@ -102,7 +103,7 @@ class Or(Criterion):
 
     def matches(self, pir: PIR) -> bool:
         """True when either sub-criterion matches."""
-        return self.left.matches(pir) or self.right.matches(pir)
+        return _matches_tree(self, pir)
 
 
 class Not(Criterion):
@@ -113,7 +114,28 @@ class Not(Criterion):
 
     def matches(self, pir: PIR) -> bool:
         """True when the inner criterion does not match."""
-        return not self.inner.matches(pir)
+        return _matches_tree(self, pir)
+
+
+def _matches_tree(tree: Criterion, pir: PIR) -> bool:
+    """Evaluate Boolean nodes without using the Python call stack, preserving short-circuiting."""
+    pending = [(tree, False)]
+    result = False
+    while pending:
+        node, evaluated_child = pending.pop()
+        if isinstance(node, Not):
+            if evaluated_child:
+                result = not result
+            else:
+                pending.extend(((node, True), (node.inner, False)))
+        elif isinstance(node, (And, Or)):
+            if not evaluated_child:
+                pending.extend(((node, True), (node.left, False)))
+            elif result == isinstance(node, And):
+                pending.append((node.right, False))
+        else:
+            result = node.matches(pir)
+    return result
 
 
 def parse_criterion(text: str) -> Criterion:
@@ -121,7 +143,7 @@ def parse_criterion(text: str) -> Criterion:
     if text is None or not str(text).strip():
         raise ParseError("search criterion is required")
     parser = _Parser(tokenize(text))
-    tree = parser.parse_or()
+    tree = parser.parse_or(0)
     parser.expect("EOF")
     return tree
 
@@ -274,34 +296,36 @@ class _Parser:
             raise ParseError(f"expected {kind}, got {got[1]!r}")
         return got
 
-    def parse_or(self) -> Criterion:
+    def parse_or(self, depth: int) -> Criterion:
         """`or := and ( "||" and )*`, grouped from the left."""
-        node = self.parse_and()
+        node = self.parse_and(depth)
         while self.peek_kind() == "OR":
             self.take()
-            node = Or(node, self.parse_and())
+            node = Or(node, self.parse_and(depth))
         return node
 
-    def parse_and(self) -> Criterion:
+    def parse_and(self, depth: int) -> Criterion:
         """`and := not ( "&&" not )*`, grouped from the left."""
-        node = self.parse_not()
+        node = self.parse_not(depth)
         while self.peek_kind() == "AND":
             self.take()
-            node = And(node, self.parse_not())
+            node = And(node, self.parse_not(depth))
         return node
 
-    def parse_not(self) -> Criterion:
+    def parse_not(self, depth: int) -> Criterion:
         """`not := "!" not | primary`."""
+        if depth > MAX_NESTING:
+            raise ParseError("criterion is nested too deeply")
         if self.peek_kind() == "NOT":
             self.take()
-            return Not(self.parse_not())
-        return self.parse_primary()
+            return Not(self.parse_not(depth + 1))
+        return self.parse_primary(depth)
 
-    def parse_primary(self) -> Criterion:
+    def parse_primary(self, depth: int) -> Criterion:
         """`primary := "(" criterion ")" | atom`."""
         if self.peek_kind() == "LPAREN":
             self.take()
-            node = self.parse_or()
+            node = self.parse_or(depth + 1)
             self.expect("RPAREN")
             return node
         return self.parse_atom()
