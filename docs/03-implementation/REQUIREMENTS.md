@@ -3,7 +3,7 @@ title: "Requirements Coverage Report"
 subtitle: "Personal Information Management (PIM) System"
 short-title: "PIM System · Requirements Coverage Report"
 version: "1.4"
-date: "8 November 2026"
+date: "13 November 2026"
 status: "Final"
 deliverable: "Deliverable 3: Implementation"
 ---
@@ -16,7 +16,7 @@ This report states which user stories of Appendix B and which requirements of th
 |----------------------------------------|----------|----------------|------------------|
 | User stories (Appendix B) | 11 | 11 | 0 |
 | Functional requirements (FR-1 – FR-43) | 43 | 43 | 0 |
-| Non-functional requirements (NFR-1 – NFR-10) | 10 | 9 | 1 |
+| Non-functional requirements (NFR-1 – NFR-10) | 10 | 10 | 0 |
 
 The evidence column names the automated tests that check each item. Test files are in `tests/unit`, `tests/integration`, and `tests/e2e`; model line coverage is reported separately in `docs/04-unit-tests/coverage.txt`.
 
@@ -91,21 +91,29 @@ The user-interface requirements FR-38 – FR-40 serve every story.
 | Id | Requirement (short) | Status | Evidence |
 |----------|--------------------------------------------------|-----------------|----------------------------------------|
 | NFR-1 | Python standard library only | Implemented | inspection of the imports in `model/`, `view/`, `controller/`, and `pim.py` |
-| NFR-2 | macOS, Python 3.12 or newer | Implemented | the test suite on macOS; the developer manual |
+| NFR-2 | macOS, Python 3.12 or newer | Implemented | full suite on CPython 3.12.4, 3.13.18, and 3.15.2 (Section 6) |
 | NFR-3 | `model` package that imports neither `view` nor `controller` | Implemented | inspection of the package layout and imports |
 | NFR-4 | A failed command changes nothing, prints no traceback, does not exit, and shows one English message | Implemented | unit, integration, and e2e error tests |
 | NFR-5 | Atomic save; failed load keeps memory; no silent loss of changes | Implemented | `unit/test_persist.py`; `unit/test_terminal.py`; `e2e/test_commands.py` |
 | NFR-6 | Time-zone-aware instants, HKT by default, UTC+8 without a time-zone database | Implemented | `unit/test_pir.py` (`ParseDatetimeTests`) |
 | NFR-7 | Search, alarm check, save, and load each under 1 s with 10,000 PIRs | Implemented | measured on 24 Sep 2026: 2 ms, 2 ms, 44 ms, 24 ms |
-| NFR-8 | Model unit tests with `unittest`, 100 % line coverage of `model/` | Not implemented | One failing assertion in `test_json_too_deep_or_too_long_is_not_a_pim_file`; `coverage.txt` still shows 800 of 800 lines |
+| NFR-8 | Model unit tests with `unittest`, 100 % line coverage of `model/` | Implemented | 291 unit tests passed and executed all 836 countable model lines on each tested version (Section 6) |
 | NFR-9 | English text; errors name the field or value | Implemented | `unit/test_pir.py` and the error tests; the user manual, Section 11 |
 | NFR-10 | No out-of-scope features | Implemented | inspection against SRS Section 2.2 |
 
 # 5. Not implemented
 
-All 11 user stories and all 43 functional requirements are implemented. NFR-8 is not fully met: `python3 -m unittest` currently has one failing assertion in `test_json_too_deep_or_too_long_is_not_a_pim_file` (`tests/unit/test_persist.py`), where the expected and actual error messages differ. The unit tests still execute all 800 countable lines of `model/`, but the test suite must pass before NFR-8 can be marked implemented. The features listed as out of scope in SRS Section 2.2 (a graphical interface, recurring events, links between PIRs, operating-system notifications, and third-party terminal libraries) are absent by design.
+The features listed as out of scope in SRS Section 2.2 (a graphical interface, recurring events, links between PIRs, operating-system notifications, and third-party terminal libraries) are absent by design.
 
 # 6. How the evidence was produced
 
+The test runs below were performed on macOS 27.2 on 13 November 2026.
+
+| CPython version | Full suite | Model line coverage |
+|-----------------|------------|---------------------|
+| 3.12.4 | 354 passed | 836 / 836 (100 %) |
+| 3.13.18 | 354 passed | 836 / 836 (100 %) |
+| 3.15.2 | 354 passed | 836 / 836 (100 %) |
+
 - `python3 -m unittest` runs all three test layers.
-- `python3 tests/coverage_report.py` writes `docs/04-unit-tests/coverage.txt`, typeset as `COVERAGE_REPORT.pdf`. It uses the standard-library `trace` module over `tests/unit` and counts the lines on which a statement starts in each file of `model/` except `__init__.py`. The method is stated at the top of `coverage.txt`.
+- `python3 tests/coverage_report.py` traces the unit tests and counts the lines on which a statement starts in each file of `model/` except `__init__.py`. The checked-in `docs/04-unit-tests/coverage.txt`, typeset as `COVERAGE_REPORT.pdf`, records the CPython 3.12.4 run.
