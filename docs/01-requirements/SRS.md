@@ -57,17 +57,7 @@ The Working Collection brings these records together. Saving it to a `.pim` file
 
 ## 2.2 Scope
 
-**In scope.** Everything that user stories US1–US11 of Appendix B require, plus one derived feature: while the program runs, it shows an **Alarm Alert** for every Event alarm that is overdue or due within the next 15 minutes. The alert is what makes the alarms of US4 useful in practice; it is not a new user story.
-
-**Out of scope.** The brief gives no credit for additional features, so the system does not provide:
-
-- a graphical user interface, or any third-party terminal library;
-- networking, multiple users, or synchronisation;
-- recurring events;
-- links between PIRs;
-- unique labels or titles, or fuzzy (edit-distance) search;
-- changing the type of an existing PIR;
-- operating-system notifications, background processes, or snoozing an alarm.
+Everything that user stories US1–US11 of Appendix B require, plus one derived feature: while the program runs, it shows an **Alarm Alert** for every Event alarm that is overdue or due within the next 15 minutes. The alert is what makes the alarms of US4 useful in practice; it is not a new user story.
 
 ## 2.3 Operating environment
 
@@ -106,6 +96,8 @@ The system reads and writes `.pim` files on the local file system. It has no oth
 
 # 4. User requirements definition
 
+# 4.1. User stories
+
 The system shall support the following user stories, quoted from Appendix B of the project description. Section 6 refines each story into system requirements.
 
 | Id | User story | Refined by |
@@ -124,7 +116,38 @@ The system shall support the following user stories, quoted from Appendix B of t
 
 The user-interface requirements FR-38 – FR-40 serve every story. The non-functional requirements NFR-1 – NFR-10 (Section 6.10) apply to the whole system.
 
+# 4.2. Non-functional requirements
+
+**NFR-1 (Standard library)** The implementation shall use only the Python 3 standard library.
+*Verification:* inspection of every import.
+
+**NFR-2 (Platform)** The system shall run on macOS with Python 3.12 or newer, in Terminal or iTerm. The developer manual shall describe this platform only.
+*Verification:* `python3 -m unittest` and the demonstration script on macOS with Python 3.12; inspection of the developer manual.
+
+**NFR-3 (Structure)** All model code shall be in a package named `model`, which shall not import `view` or `controller`. The other components shall be in the packages `view` and `controller`.
+*Verification:* inspection of the imports.
+
+**NFR-4 (Reliability)** Invalid input or a failed command shall not change the Working Collection, shall not print a traceback, and shall not end the process. The system shall report exactly one English message on the status line. This covers at least an unknown command, a missing required field, a bad Id or row number, a bad date or time, a search syntax error, a path without `.pim` on load, a missing file name, a missing Selection, and an attempt to change the type of a PIR. An unexpected internal error in a command shall be reported as `command failed`, and the session shall continue.
+*Verification:* unit, integration, and e2e error tests.
+
+**NFR-5 (Data integrity)** A failed save shall not damage the earlier file, and a failed load shall not change the Working Collection (FR-32, FR-36). The system shall never discard unsaved changes without asking or, for redirected input, without saying so (FR-37).
+*Verification:* unit tests `test_failed_replace_keeps_earlier_file_and_leaves_no_temp`, `test_bad_json_does_not_clobber_memory`, and `test_dirty_quit_save_discard_and_invalid_choice`; e2e test `test_piped_input_ending_with_unsaved_changes_says_so`.
+
+**NFR-6 (Time)** Every stored time shall carry a time zone. The default zone shall be HKT, and comparisons shall use instants (FR-11, FR-20). If the computer has no time-zone database, the system shall use a fixed UTC+8 offset for HKT instead of failing to start.
+*Verification:* unit tests `ParseDatetimeTests`, including `test_missing_zone_database_falls_back_to_fixed_utc_plus_8`.
+
+**NFR-7 (Performance)** With 10,000 PIRs in the Working Collection, each of the following shall finish within 1 second on the development Mac: a search, the alarm check, a save, and a load.
+*Verification:* measured on 24 Sep 2026 with 2,500 PIRs of each type, every Event having three alarms, taking the best of five runs. The search `type = event && description contains "comp" || alarm < 2026-10-01 00:00` took 2 ms, the alarm check 2 ms, a save 44 ms, and a load 24 ms.
+
+**NFR-8 (Testability)** Every model rule shall be testable through the public interface of `model`, without the user interface. The model unit tests shall use `unittest`, run automatically, pass, and execute every countable line of `model/`. Only `model/__init__.py`, which merely re-exports names, is excluded from the count.
+*Verification:* `python3 -m unittest`; `python3 tests/coverage_report.py`.
+
+**NFR-9 (Usability)** Prompts, messages, and manuals shall be in English. Each error message shall say what went wrong and shall name the field or value at fault when there is one, for example `description is required` or `no PIR with Id 9`.
+*Verification:* unit test `test_validation_messages_name_the_field_or_value_at_fault` and the error tests of NFR-4 assert the exact message text; inspection of the error table in the user manual.
+
 # 5. System architecture
+
+# 5.1. Overview
 
 The system follows the **Model–View–Controller** (MVC) pattern, with one Python package for each component. The design document describes the architecture in full; this section only names the parts so that the requirements can refer to them.
 
@@ -138,6 +161,29 @@ The system follows the **Model–View–Controller** (MVC) pattern, with one Pyt
 - **`controller`** turns one completed user action into calls on the model. It keeps the Current Result and the Selection, and it reports the outcome of every action, success or failure, as one status-line message.
 - **`view`** draws the terminal screen, reads keys and lines, runs the event loop, and shows Alarm Alerts. It sends every action to the controller. From the model it uses only value types: it displays PIRs and alerts, and it builds alarm values from the user's answers. It also reports input that never reaches the controller, such as an unknown command or an empty path.
 - **`pim.py`** is the composition root. It creates `PIM()`, then `App(pim)`, then `Terminal(app)`, and runs the terminal.
+
+# 5.2. Reused components
+
+PIM makes substantial, intentional use of reusable components.
+
+### Model
+
+- **`PIM`** provides one shared model interface for the controller, both user interfaces, and the automated tests. Creation, modification, searching, alarms, saving, and loading all use the same model operations.
+- **`FieldSpec`** defines the fields of every PIR type. The View reuses these definitions to generate both create and modify prompts.
+- **Criterion classes and `parse_criterion`** centralise search parsing and matching, so the same search rules are used by the command interface, controller, and model tests.
+- **Shared datetime and alarm helpers** such as `parse_datetime`, `format_datetime`, `RelativeAlarm`, and `AbsoluteAlarm` are reused by PIR validation, searching, alerts, and persistence.
+
+### View
+
+- **`Screen` and layout helpers** are shared by the line interface and curses interface, ensuring both display the same Current Result, Selection, alerts, and status information.
+- **`Prompt`, `Chooser`, and `DateTimePicker`** provide reusable interaction components for create, modify, confirmation, alarm, and dirty-state workflows.
+- **`FileBrowser`** is reused for both load and save-as operations. Browsed paths and typed paths are passed to the same existing validation and command handlers.
+
+### Controller
+
+- **`App`** is shared by the line-based and curses interfaces. Both front ends therefore use the same implementation of selection, search, printing, modification, deletion, saving, and loading.
+- **`message_for`** provides one reusable conversion from model or operating-system errors to English status-line messages.
+- **`format_pir`** is reused by both `print` and `print all`, ensuring PIR details have the same format in both commands.
 
 # 6. System requirements specification
 
@@ -339,32 +385,4 @@ A row number shall select by position in the Current Result and shall not be tre
 
 ## 6.10 Non-functional requirements
 
-**NFR-1 (Standard library)** The implementation shall use only the Python 3 standard library.
-*Verification:* inspection of every import.
-
-**NFR-2 (Platform)** The system shall run on macOS with Python 3.12 or newer, in Terminal or iTerm. The developer manual shall describe this platform only.
-*Verification:* `python3 -m unittest` and the demonstration script on macOS with Python 3.12; inspection of the developer manual.
-
-**NFR-3 (Structure)** All model code shall be in a package named `model`, which shall not import `view` or `controller`. The other components shall be in the packages `view` and `controller`.
-*Verification:* inspection of the imports.
-
-**NFR-4 (Reliability)** Invalid input or a failed command shall not change the Working Collection, shall not print a traceback, and shall not end the process. The system shall report exactly one English message on the status line. This covers at least an unknown command, a missing required field, a bad Id or row number, a bad date or time, a search syntax error, a path without `.pim` on load, a missing file name, a missing Selection, and an attempt to change the type of a PIR. An unexpected internal error in a command shall be reported as `command failed`, and the session shall continue.
-*Verification:* unit, integration, and e2e error tests.
-
-**NFR-5 (Data integrity)** A failed save shall not damage the earlier file, and a failed load shall not change the Working Collection (FR-32, FR-36). The system shall never discard unsaved changes without asking or, for redirected input, without saying so (FR-37).
-*Verification:* unit tests `test_failed_replace_keeps_earlier_file_and_leaves_no_temp`, `test_bad_json_does_not_clobber_memory`, and `test_dirty_quit_save_discard_and_invalid_choice`; e2e test `test_piped_input_ending_with_unsaved_changes_says_so`.
-
-**NFR-6 (Time)** Every stored time shall carry a time zone. The default zone shall be HKT, and comparisons shall use instants (FR-11, FR-20). If the computer has no time-zone database, the system shall use a fixed UTC+8 offset for HKT instead of failing to start.
-*Verification:* unit tests `ParseDatetimeTests`, including `test_missing_zone_database_falls_back_to_fixed_utc_plus_8`.
-
-**NFR-7 (Performance)** With 10,000 PIRs in the Working Collection, each of the following shall finish within 1 second on the development Mac: a search, the alarm check, a save, and a load.
-*Verification:* measured on 24 Sep 2026 with 2,500 PIRs of each type, every Event having three alarms, taking the best of five runs. The search `type = event && description contains "comp" || alarm < 2026-10-01 00:00` took 2 ms, the alarm check 2 ms, a save 44 ms, and a load 24 ms.
-
-**NFR-8 (Testability)** Every model rule shall be testable through the public interface of `model`, without the user interface. The model unit tests shall use `unittest`, run automatically, pass, and execute every countable line of `model/`. Only `model/__init__.py`, which merely re-exports names, is excluded from the count.
-*Verification:* `python3 -m unittest`; `python3 tests/coverage_report.py`.
-
-**NFR-9 (Usability)** Prompts, messages, and manuals shall be in English. Each error message shall say what went wrong and shall name the field or value at fault when there is one, for example `description is required` or `no PIR with Id 9`.
-*Verification:* unit test `test_validation_messages_name_the_field_or_value_at_fault` and the error tests of NFR-4 assert the exact message text; inspection of the error table in the user manual.
-
-**NFR-10 (Scope)** The system shall not include any of the out-of-scope features listed in Section 2.2.
-*Verification:* inspection of the commands (FR-38) and of the source code against the list in Section 2.2.
+See 4.2. Non-functional requirements
